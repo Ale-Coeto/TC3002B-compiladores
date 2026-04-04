@@ -1,0 +1,12 @@
+# Rust
+target/
+
+# Backup files
+*~
+
+# Editor settings
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
