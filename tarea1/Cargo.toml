@@ -2,5 +2,6 @@
 name = "tarea1"
 version = "0.1.0"
 edition = "2024"
+authors = ["Alejandra Coeto"]
 
 [dependencies]

@@ -1,11 +1,17 @@
+//! Stack implementation as linked list to support LIFO operations.
+//! Uses a smart `Box` pointer to store nodes on the heap.
+
 use super::node::Node;
 
+/// LIFO Stack 
 pub struct Stack<T> {
     head: Option<Box<Node<T>>>,
     length: usize,
 }
 
 impl<T> Stack<T> {
+
+    /// Creates a new empty stack.
     pub fn new() -> Self {
         Self { 
             head: None,
@@ -13,12 +19,21 @@ impl<T> Stack<T> {
         }
     }
 
+    /// Adds an item to the top of the stack.
+    /// Time complexity: O(1)
+    /// # Arguments
+    /// * `value` - The value to push.
     pub fn push(&mut self, value: T) {
         let new_node = Box::new(Node::new(value, self.head.take()));
         self.head = Some(new_node);
         self.length += 1;
     }
 
+    /// Removes the top item from the stack and returns its value.
+    /// Time complexity: O(1)
+    /// # Returns
+    /// * `Some(T)` - The top value if the stack is not empty.
+    /// * `None` - If the stack is empty.
     pub fn pop(&mut self) -> Option<T> {
         if let Some(node) = self.head.take() {
             self.head = node.next;
@@ -28,6 +43,11 @@ impl<T> Stack<T> {
         None
     }
 
+    /// Returns a reference to the top item without removing it.
+    /// Time complexity: O(1)
+    /// # Returns
+    /// * `Some(&T)` - A reference to the top value if the stack is not empty.
+    /// * `None` - If the stack is empty.
     pub fn peek(&self) -> Option<&T> {
         if let Some(node) = &self.head {
             return Some(&node.value)
@@ -35,10 +55,14 @@ impl<T> Stack<T> {
         None
     }
     
+    /// Returns the number of items in the stack.
+    /// Time complexity: O(1)
     pub fn length(&self) -> usize {
         return self.length;
     }
 
+    /// Checks whether the stack is empty.
+    /// Time complexity: O(1)
     pub fn is_empty(&self) -> bool {
         return self.length == 0
     }
