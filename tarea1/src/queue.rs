@@ -20,8 +20,6 @@ impl<T> Queue<T> {
 
     /// Adds an item to the back of the queue.
     /// Time complexity: O(n)
-    /// # Arguments
-    /// * `value` - The value to push.
     pub fn push(&mut self, value: T) {
         let new_node = Box::new(Node::new(value, None));
         let mut temp = &mut self.head;
@@ -34,9 +32,6 @@ impl<T> Queue<T> {
 
     /// Removes the front item from the queue and returns its value.
     /// Time complexity: O(1)
-    /// # Returns
-    /// * `Some(T)` - The front value if the queue is not empty.
-    /// * `None` - If the queue is empty.
     pub fn pop(&mut self) -> Option<T> {
         if let Some(node) = self.head.take() {
             self.head = node.next;
@@ -49,9 +44,6 @@ impl<T> Queue<T> {
 
     /// Returns a reference to the front item without removing it.
     /// Time complexity: O(1)
-    /// # Returns
-    /// * `Some(&T)` - A reference to the front value if the queue is not empty.
-    /// * `None` - If the queue is empty.
     pub fn peek(&self) -> Option<&T> {
         if let Some(node) = &self.head {
             return Some(&node.value);

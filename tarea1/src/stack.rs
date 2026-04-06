@@ -21,8 +21,6 @@ impl<T> Stack<T> {
 
     /// Adds an item to the top of the stack.
     /// Time complexity: O(1)
-    /// # Arguments
-    /// * `value` - The value to push.
     pub fn push(&mut self, value: T) {
         let new_node = Box::new(Node::new(value, self.head.take()));
         self.head = Some(new_node);
@@ -31,9 +29,6 @@ impl<T> Stack<T> {
 
     /// Removes the top item from the stack and returns its value.
     /// Time complexity: O(1)
-    /// # Returns
-    /// * `Some(T)` - The top value if the stack is not empty.
-    /// * `None` - If the stack is empty.
     pub fn pop(&mut self) -> Option<T> {
         if let Some(node) = self.head.take() {
             self.head = node.next;
@@ -45,9 +40,6 @@ impl<T> Stack<T> {
 
     /// Returns a reference to the top item without removing it.
     /// Time complexity: O(1)
-    /// # Returns
-    /// * `Some(&T)` - A reference to the top value if the stack is not empty.
-    /// * `None` - If the stack is empty.
     pub fn peek(&self) -> Option<&T> {
         if let Some(node) = &self.head {
             return Some(&node.value)

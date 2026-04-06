@@ -48,9 +48,6 @@ impl<K: Hash + PartialEq, T> HashMap<K, T> {
     /// Inserts a key-value pair into the map.
     /// Replaces the value if the key already exists.
     /// Time complexity: average O(1), worst-case O(n)
-    /// # Arguments
-    /// * `key` - The key to insert.
-    /// * `value` - The value associated with the key.
     pub fn insert(&mut self, key: K, value: T) {
         if (self.size as f64 / self.capacity as f64) > 0.75 {
             self.resize();
@@ -68,11 +65,6 @@ impl<K: Hash + PartialEq, T> HashMap<K, T> {
 
     /// Returns a reference to the value associated with a key.
     /// Time complexity: average O(1), worst-case O(n)
-    /// # Arguments
-    /// * `key` - The key to look up.
-    /// # Returns
-    /// * `Some(&T)` - A reference to the value if key exists.
-    /// * `None` - If key does not exist.
     pub fn get(&self, key: &K) -> Option<&T> {
         let index = hash_index(&key, self.capacity); 
         for pair in &self.data[index] {
@@ -86,8 +78,6 @@ impl<K: Hash + PartialEq, T> HashMap<K, T> {
 
     /// Removes a key-value pair from the map if the key exists.
     /// Time complexity: average O(1), worst-case O(n)
-    /// # Arguments
-    /// * `key` - The key to remove.
     pub fn remove(&mut self, key: K) {
         let index = hash_index(&key, self.capacity);
         let index_list = &mut self.data[index];
@@ -102,11 +92,6 @@ impl<K: Hash + PartialEq, T> HashMap<K, T> {
 
     /// Checks whether a key exists in the map.
     /// Time complexity: average O(1), worst-case O(n)
-    /// # Arguments
-    /// * `key` - The key to check.
-    /// # Returns
-    /// * `true` - If the key exists.
-    /// * `false` - If the key does not exist.
     pub fn has_key(&self, key: &K) -> bool {
         let index = hash_index(&key, self.capacity);
         for pair in &self.data[index] {

@@ -1,3 +1,5 @@
+//! Generic node used for Linked List
+
 pub(crate) struct Node<T> {
 	pub(crate) value: T,
 	pub(crate) next: Option<Box<Node<T>>>,
