@@ -10,3 +10,7 @@ target/
 
 # macOS
 .DS_Store
+
+# Other
+*.pdf
+*.zip
