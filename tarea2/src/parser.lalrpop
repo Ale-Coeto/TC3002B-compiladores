@@ -1,3 +1,5 @@
+//! Parser to handle Logos (lexer) tokens
+
 grammar;
 
 use crate::lexer::Token;

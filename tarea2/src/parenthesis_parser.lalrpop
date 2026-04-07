@@ -1,3 +1,5 @@
+//! Parser that validates parenthesis and returns inner number
+
 use std::str::FromStr;
 
 grammar;
