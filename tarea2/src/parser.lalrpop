@@ -1,0 +1,27 @@
+grammar;
+
+use crate::lexer::Token;
+
+extern {
+    enum Token {
+        "load" => Token::Load,
+        "=" => Token::Equals,
+        "+" => Token::Plus,
+        IdentText => Token::Text(<String>),
+    }
+}
+
+pub Statement: () = {
+    "load" <id:Text> "=" <expr:Expr> => {
+        println!("Parsed: {} = {}", id, expr);
+    }
+};
+
+Expr: String = {
+    <l:Text> "+" <r:Text> => format!("{} + {}", l, r),
+    <t:Text> => t,
+};
+
+Text: String = {
+    <s:IdentText> => s,
+};
