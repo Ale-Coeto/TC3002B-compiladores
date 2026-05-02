@@ -1,0 +1,18 @@
+grammar;
+use crate::scanner::Token;
+
+extern {
+    type Location = usize;
+    type Error = ();
+    
+    enum Token {
+        "programa" => Token::Programa,
+        Identificador => Token::Identificador(<String>),
+        "inicio" => Token::Inicio,
+        "fin" => Token::Fin,
+    }
+}
+
+pub Programa: () = {
+    "programa" <_id:Identificador> "inicio" "fin" => ()
+};
