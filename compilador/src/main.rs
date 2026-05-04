@@ -8,10 +8,10 @@ use lalrpop_util::lalrpop_mod;
 lalrpop_mod!(pub grammar);
 
 fn main() {
-    let input: &str = "programa inicio hola fin x1";
+    let input: &str = "o programa inicio hola fin x1";
     
     let mut scanner: Scanner = Scanner::new(input);
-    let primer_token = scanner.get_next();
+    let primer_token = scanner.next();
     println!("primer token: {:?}", primer_token);
 
     let parser: Parser = Parser::new();

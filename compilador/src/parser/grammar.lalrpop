@@ -14,5 +14,128 @@ extern {
 }
 
 pub Programa: () = {
-    "programa" <_id:Identificador> "inicio" "fin" => ()
+    "programa" <_id:Identificador> ";" OpcionesPrograma "inicio" Cuerpo "fin" => ()
+};
+
+OpcionesPrograma: () = {
+    Vars ListaFuncs => (),
+    ListaFuncs => (),
+};
+
+ListaFuncs: () = {
+    Funcs ListaFuncs => (),
+    => (),
+};
+
+Vars: () => {
+    "vars" ListaVars => ()
+};
+
+ListaVars: () = {
+    ListaId ":" Tipo ";" AgregarVars => (),
+};
+
+ListaId: = {
+    <_id:Identificador> AgregarId => (),
+};
+
+AgregarId: () = {
+    "," ListaId => (),
+    => (),
+};
+
+AgregarVars: () = {
+    ListaVars => (),
+    => (),
+};
+
+Funcs: () = {
+    "nula" DefFunc => (),
+    Tipo DefFunc => (),
+};
+
+DefFunc: () = {
+    <_id:Identificador> "(" ListaArgs ")" "{" OpcionVars Cuerpo "}" ";" => (),
+};
+
+ListaArgs: () = {
+    Args => (),
+    => (),
+};
+
+Args: () = {
+    <_id:Identificador> ":" Tipo AgregarArgs => (),
+};
+
+AgregarArgs: () = {
+    "," Args => (),
+    => (),
+};
+
+OpcionVars: () = {
+    Vars => (),
+    => (),
+};
+
+Cuerpo: () = {
+    "{" ListaEstatuto "}" => (),
+};
+
+ListaEstatuto: () = {
+    Estatuto ListaEstatuto => (),
+    => (),
+};
+
+Tipo: () = {
+    "entero" => (),
+    "flotante" => (),
+};
+
+Estatuto: () = {
+    <_id:Identificador> AsignaOLlamada => (),
+    Condicion => (),
+    Ciclo => (),
+    Imprime => (),
+    "[" ListaEstatuto "]" => (),
+};
+
+ListaEstatuto: () = {
+    Estatuto ListaEstatuto => (),
+    => (),
+};
+
+AsignaOLlamada: () = {
+    "=" Expresion ";" => (),
+    LlamadaSinId => (),
+};
+
+Condicion: () = {
+    "si" "(" Expresion ")" Cuerpo OpcionSino ";" => (),
+};
+
+OpcionSino: () = {
+    "sino" Cuerpo => (),
+    => (),
+};
+
+Ciclo: () = {
+    "mientras" "(" Expresion ")" "haz" Cuerpo ";" => (),
+};
+
+LlamadaSinId: () = {
+    "(" ListaExpresion ")" ";" => (),
+};
+
+Llamada: () = {
+    <_id:Identificador> LlamadaSinId => (),
+};
+
+ListaExpresion: () = {
+    Expresion AgregarExpresion => (),
+    => (),
+};
+
+AgregarExpresion: () = {
+    "," Expresion AgregarExpresion => (),
+    => (),
 };

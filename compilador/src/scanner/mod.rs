@@ -13,10 +13,6 @@ impl<'a> Scanner<'a> {
             lexer: Token::lexer(input),
         }
     }
-
-    pub fn get_next(&mut self) -> Option<Result<Token, ()>> {
-        return self.lexer.next();
-    }
 }
 
 impl<'a> Iterator for Scanner<'a> {
@@ -33,4 +29,38 @@ impl<'a> Iterator for Scanner<'a> {
             }
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod identificador {
+        use super::*;
+
+        #[test]
+        fn test_identificador() {
+            let mut scanner: Scanner = Scanner::new("hola");
+            let (_, token, _) = scanner.next().expect("Expected a token");
+    
+            assert_eq!(token, Token::Identificador("hola".to_string()));
+        }
+    }
+
+    #[test]
+    fn test_constante_entero() {
+        let mut scanner: Scanner = Scanner::new("12");
+        let (_, token, _) = scanner.next().expect("Expected a token");
+
+        assert_eq!(token, Token::ConstanteEntero(12));
+    }
+
+    #[test]
+    fn test_constante_flotante() {
+        let mut scanner: Scanner = Scanner::new("12.1");
+        let (_, token, _) = scanner.next().expect("Expected a token");
+
+        assert_eq!(token, Token::ConstanteFlotante(12.1));
+    }
+
 }
