@@ -5,7 +5,7 @@ use scanner::Scanner;
 use parser::Parser;
 
 use lalrpop_util::lalrpop_mod;
-lalrpop_mod!(pub grammar);
+lalrpop_mod!(pub grammar, "/parser/grammar.rs");
 
 fn main() {
     let input: &str = "o programa inicio hola fin x1";
@@ -18,7 +18,7 @@ fn main() {
     let result = parser.parse(input);
     
     match result {
-        Ok(_) => println!("Program is valid ✅"),
-        Err(e) => println!("Syntax error ❌: {:?}", e),
+        Ok(_) => println!("Program is valid"),
+        Err(e) => println!("Syntax error: {:?}", e),
     }
 }

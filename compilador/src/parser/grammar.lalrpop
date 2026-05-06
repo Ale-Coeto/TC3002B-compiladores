@@ -127,7 +127,12 @@ Estatuto: () = {
     Condicion => (),
     Ciclo => (),
     Imprime => (),
-    "[" ListaEstatuto "]" => (),
+    "[" ListaEstatutoAdentro "]" => (),
+};
+
+ListaEstatutoAdentro: () = {
+    Estatuto ListaEstatutoAdentro => (),
+    => (),
 };
 
 AsignaOLlamada: () = {
@@ -219,6 +224,7 @@ AgregarFactor: () = {
 Factor: () = {
     "(" Expresion ")" => (),
     Signo Valor => (),
+    Constante => (),
     <_id:Identificador> OpcionFactorId=> (),
 };
 

@@ -107,10 +107,9 @@ pub enum Token {
     ConstanteEntero(i64),
 
     // Identificador y letrero
-    #[regex(r#""([^"\\]|\\.)*""#, |lex| lex.slice().to_string())]    
-    Letrero(String),
-    
     #[regex("[a-zA-Z_][a-zA-Z0-9_]*", |lex| lex.slice().to_string())]
     Identificador(String),
 
+    #[regex(r#""([^"\\]|\\.)*""#, |lex| lex.slice().to_string())]    
+    Letrero(String),
 }

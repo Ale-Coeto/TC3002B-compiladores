@@ -27,18 +27,20 @@ impl<'a> Iterator for Scanner<'a> {
     type Item = (usize, Token, usize);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let tok = self.lexer.next()?;
-        let span = self.lexer.span();
+        loop {
+            let tok = self.lexer.next()?;
+            let span = self.lexer.span();
 
-        match tok {
-            Ok(t) => Some((span.start, t, span.end)),
-            Err(_) => {
-                self.errors.push(LexError {
-                    start: span.start,
-                    end: span.end,
-                });
-                None
-            },
+            return match tok {
+                Ok(t) => Some((span.start, t, span.end)),
+                Err(_) => {
+                    self.errors.push(LexError {
+                        start: span.start,
+                        end: span.end,
+                    });
+                    continue;
+                },
+            }
         }
     }
 }
@@ -202,182 +204,182 @@ mod tests {
         use super::*;
 
         #[test]
-        fn test_13_01_puntoycoma_success() {
+        fn test_01_01_puntoycoma_success() {
             test_token_success(";", Token::PuntoYComa);
         }
 
         #[test]
-        fn test_13_02_puntoycoma_invalid() {
+        fn test_01_02_puntoycoma_invalid() {
             test_token_not_present("punto :", Token::PuntoYComa);
         }
 
         #[test]
-        fn test_14_01_dospuntos_success() {
+        fn test_02_01_dospuntos_success() {
             test_token_success(":", Token::DosPuntos);
         }
 
         #[test]
-        fn test_14_02_dospuntos_invalid() {
+        fn test_02_02_dospuntos_invalid() {
             test_token_not_present("; ,,", Token::DosPuntos);
         }
 
         #[test]
-        fn test_15_01_coma_success() {
+        fn test_03_01_coma_success() {
             test_token_success(",", Token::Coma);
         }
 
         #[test]
-        fn test_15_02_coma_invalid() {
+        fn test_03_02_coma_invalid() {
             test_token_not_present("coma ;", Token::Coma);
         }
 
         #[test]
-        fn test_16_01_llaveabrir_success() {
+        fn test_04_01_llaveabrir_success() {
             test_token_success("{", Token::LlaveAbrir);
         }
 
         #[test]
-        fn test_16_02_llaveabrir_invalid() {
+        fn test_04_02_llaveabrir_invalid() {
             test_token_not_present("llave } ; [", Token::LlaveAbrir);
         }
 
         #[test]
-        fn test_17_01_llavecerrar_success() {
+        fn test_05_01_llavecerrar_success() {
             test_token_success("}", Token::LlaveCerrar);
         }
 
         #[test]
-        fn test_17_02_llavecerrar_invalid() {
+        fn test_05_02_llavecerrar_invalid() {
             test_token_not_present("] ) {", Token::LlaveCerrar);
         }
 
         #[test]
-        fn test_18_01_corcheteabrir_success() {
+        fn test_06_01_corcheteabrir_success() {
             test_token_success("[", Token::CorcheteAbrir);
         }
 
         #[test]
-        fn test_18_02_corcheteabrir_invalid() {
+        fn test_06_02_corcheteabrir_invalid() {
             test_token_not_present("corchete { ( ]", Token::CorcheteAbrir);
         }
 
         #[test]
-        fn test_19_01_corchetecerrar_success() {
+        fn test_07_01_corchetecerrar_success() {
             test_token_success("]", Token::CorcheteCerrar);
         }
 
         #[test]
-        fn test_19_02_corchetecerrar_invalid() {
+        fn test_07_02_corchetecerrar_invalid() {
             test_token_not_present("} ) [", Token::CorcheteCerrar);
         }
 
         #[test]
-        fn test_20_01_parentesisabrir_success() {
+        fn test_08_01_parentesisabrir_success() {
             test_token_success("(", Token::ParentesisAbrir);
         }
 
         #[test]
-        fn test_20_02_parentesisabrir_invalid() {
+        fn test_08_02_parentesisabrir_invalid() {
             test_token_not_present("{ [ )", Token::ParentesisAbrir);
         }
 
         #[test]
-        fn test_21_01_parentesiscerrar_success() {
+        fn test_09_01_parentesiscerrar_success() {
             test_token_success(")", Token::ParentesisCerrar);
         }
 
         #[test]
-        fn test_21_02_parentesiscerrar_invalid() {
+        fn test_09_02_parentesiscerrar_invalid() {
             test_token_not_present("} ] (", Token::ParentesisCerrar);
         }
 
         #[test]
-        fn test_22_01_comparadorigual_success() {
+        fn test_10_01_comparadorigual_success() {
             test_token_success("==", Token::ComparadorIgual);
         }
 
         #[test]
-        fn test_22_02_comparadorigual_invalid() {
+        fn test_10_02_comparadorigual_invalid() {
             test_token_not_present("= =", Token::ComparadorIgual);
         }
 
         #[test]
-        fn test_23_01_noigual_success() {
+        fn test_11_01_noigual_success() {
             test_token_success("!=", Token::NoIgual);
         }
 
         #[test]
-        fn test_23_02_noigual_invalid() {
+        fn test_11_02_noigual_invalid() {
             test_token_not_present("= ==", Token::NoIgual);
         }
 
         #[test]
-        fn test_24_01_mayor_success() {
+        fn test_12_01_mayor_success() {
             test_token_success(">", Token::Mayor);
         }
 
         #[test]
-        fn test_24_02_mayor_invalid() {
+        fn test_12_02_mayor_invalid() {
             test_token_not_present("<", Token::Mayor);
         }
 
         #[test]
-        fn test_25_01_menor_success() {
+        fn test_13_01_menor_success() {
             test_token_success("<", Token::Menor);
         }
 
         #[test]
-        fn test_25_02_menor_invalid() {
+        fn test_13_02_menor_invalid() {
             test_token_not_present(">", Token::Menor);
         }
 
         #[test]
-        fn test_26_01_igual_success() {
+        fn test_14_01_igual_success() {
             test_token_success("=", Token::Igual);
         }
 
         #[test]
-        fn test_26_02_igual_invalid() {
+        fn test_14_02_igual_invalid() {
             test_token_not_present("== !=", Token::Igual);
         }
 
         #[test]
-        fn test_27_01_mas_success() {
+        fn test_15_01_mas_success() {
             test_token_success("+", Token::Mas);
         }
 
         #[test]
-        fn test_27_02_mas_invalid() {
+        fn test_15_02_mas_invalid() {
             test_token_not_present("plus -", Token::Mas);
         }
 
         #[test]
-        fn test_28_01_menos_success() {
+        fn test_16_01_menos_success() {
             test_token_success("-", Token::Menos);
         }
 
         #[test]
-        fn test_28_02_menos_invalid() {
+        fn test_16_02_menos_invalid() {
             test_token_not_present("minus =", Token::Menos);
         }
 
         #[test]
-        fn test_29_01_multiplicar_success() {
+        fn test_17_01_multiplicar_success() {
             test_token_success("*", Token::Multiplicar);
         }
 
         #[test]
-        fn test_29_02_multiplicar_invalid() {
+        fn test_17_02_multiplicar_invalid() {
             test_token_not_present("star x", Token::Multiplicar);
         }
 
         #[test]
-        fn test_30_01_dividir_success() {
+        fn test_18_01_dividir_success() {
             test_token_success("/", Token::Dividir);
         }
 
         #[test]
-        fn test_30_02_dividir_invalid() {
+        fn test_18_02_dividir_invalid() {
             test_token_not_present("}]", Token::Dividir);
         }
     }
@@ -386,7 +388,7 @@ mod tests {
         use super::*;
 
         #[test]
-        fn test_31_01_cte_entero_success() {
+        fn test_01_01_cte_entero_success() {
             let cases = [1, 9, 12220909, -12, -987654321, 0, 01, 20];
             let input = cases.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(" ");
             let mut scanner: Scanner = Scanner::new(&input);
@@ -400,7 +402,7 @@ mod tests {
         }
 
         #[test]
-        fn test_32_01_cte_flotante_success() {
+        fn test_02_01_cte_flotante_success() {
             let cases = ["1.0", "0.9", "0.10", "-0.1", "-1.0"];
             let input = cases.join(" ");
             let mut scanner: Scanner = Scanner::new(&input);
@@ -415,7 +417,7 @@ mod tests {
         }
 
         #[test]
-        fn test_32_02_cte_flotante_cientifico_success() {
+        fn test_03_01_cte_flotante_cientifico_success() {
             let cases = ["1.0e1","1.0E1","-0.1e+1","2.0e-3","3.5E-2","0.0e0","5.25e+3"];
 
             let input = cases.join(" ");
@@ -432,7 +434,7 @@ mod tests {
         }
 
         #[test]
-        fn test_33_01_identificador_success() {
+        fn test_04_01_identificador_success() {
             let cases = ["hola", "_start", "a1_b2"];
             let input = cases.join(" ");
             let mut scanner: Scanner = Scanner::new(&input);
@@ -447,7 +449,14 @@ mod tests {
         }
 
         #[test]
-        fn test_34_01_letrero_success() {
+        fn test_04_02_identificador_invalid() {
+            test_token_not_present("1abc", Token::Identificador("1abc".to_string()));
+            test_token_not_present("9_start", Token::Identificador("9_start".to_string()));
+            test_token_not_present("-foo", Token::Identificador("-foo".to_string()));
+        }
+
+        #[test]
+        fn test_05_01_letrero_success() {
             let cases = ["\"hola\"", "\"he\\\"llo\"", "\"\\\\\""]; 
             let input = cases.join(" ");
             let mut scanner: Scanner = Scanner::new(&input);
@@ -462,5 +471,25 @@ mod tests {
         }
     }
 
+    mod errors {
+        use super::*;
+
+        #[test]
+        fn test_01_01_puntuacion_error() {
+            let mut scanner: Scanner = Scanner::new("& @ $ # . | \\");
+            while scanner.next().is_some() {}
+
+            assert_eq!(scanner.get_errors().len(), 7);
+        }
+
+        #[test]
+        fn test_01_02_strings_error() {
+            let mut scanner = Scanner::new(".holas 'no \"eee");
+            while scanner.next().is_some() {}
+
+            assert_eq!(scanner.get_errors().len(), 3);
+        }
+
+    }
 
 }
