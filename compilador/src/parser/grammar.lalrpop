@@ -7,9 +7,40 @@ extern {
     
     enum Token {
         "programa" => Token::Programa,
-        Identificador => Token::Identificador(<String>),
         "inicio" => Token::Inicio,
         "fin" => Token::Fin,
+        "entero" => Token::Entero,
+        "flotante" => Token::Flotante,
+        "vars" => Token::Variable,
+        "escribe" => Token::Escribe,
+        "nula" => Token::Nula,
+        "mientras" => Token::Mientras,
+        "haz" => Token::Haz,
+        "si" => Token::Si,
+        "sino" => Token::Sino,
+        ";" => Token::PuntoYComa,
+        ":" => Token::DosPuntos,
+        "," => Token::Coma,
+        "{" => Token::LlaveAbrir,
+        "}" => Token::LlaveCerrar,
+        "[" => Token::CorcheteAbrir,
+        "]" => Token::CorcheteCerrar,
+        "(" => Token::ParentesisAbrir,
+        ")" => Token::ParentesisCerrar,
+        "==" => Token::ComparadorIgual,
+        "!=" => Token::NoIgual,
+        ">" => Token::Mayor,
+        "<" => Token::Menor,
+        "=" => Token::Igual,
+        "+" => Token::Mas,
+        "-" => Token::Menos,
+        "*" => Token::Multiplicar,
+        "/" => Token::Dividir,
+        
+        Entero => Token::ConstanteEntero(<i64>),
+        Flotante => Token::ConstanteFlotante(<f64>),
+        Letrero => Token::Letrero(<String>),
+        Identificador => Token::Identificador(<String>),
     }
 }
 
@@ -27,15 +58,15 @@ ListaFuncs: () = {
     => (),
 };
 
-Vars: () => {
-    "vars" ListaVars => ()
+Vars: () = {
+    "vars" ListaVars => (),
 };
 
 ListaVars: () = {
     ListaId ":" Tipo ";" AgregarVars => (),
 };
 
-ListaId: = {
+ListaId: () = {
     <_id:Identificador> AgregarId => (),
 };
 
@@ -99,11 +130,6 @@ Estatuto: () = {
     "[" ListaEstatuto "]" => (),
 };
 
-ListaEstatuto: () = {
-    Estatuto ListaEstatuto => (),
-    => (),
-};
-
 AsignaOLlamada: () = {
     "=" Expresion ";" => (),
     LlamadaSinId => (),
@@ -138,4 +164,80 @@ ListaExpresion: () = {
 AgregarExpresion: () = {
     "," Expresion AgregarExpresion => (),
     => (),
+};
+
+Imprime: () = {
+    "escribe" "(" OpcionImprime ")" ";" => (),
+};
+
+OpcionImprime: () = {
+    ElementoImprime AgregarOpcionImprime => (),
+};
+
+ElementoImprime: () = {
+    Expresion => (),
+    <_l:Letrero> => (),
+};
+
+AgregarOpcionImprime: () = {
+    "," ElementoImprime AgregarOpcionImprime => (),
+    => (),
+};
+
+Expresion: () = {
+    Exp OpcionExp => (),
+};
+
+OpcionExp: () = {
+    ">" Exp => (),
+    "<" Exp => (),
+    "!=" Exp => (),
+    "==" Exp => (),
+    => (),
+};
+
+Exp: () = {
+    Termino AgregarTermino => (),
+};
+
+AgregarTermino: () = {
+    "+" Exp => (),
+    "-" Exp => (),
+    => (),
+};
+
+Termino: () = {
+    Factor AgregarFactor => (),
+};
+
+AgregarFactor: () = {
+    "*" Termino => (),
+    "/" Termino => (),
+    => (),
+};
+
+Factor: () = {
+    "(" Expresion ")" => (),
+    Signo Valor => (),
+    <_id:Identificador> OpcionFactorId=> (),
+};
+
+OpcionFactorId: () = {
+    LlamadaSinId => (),
+    => (),
+};
+
+Signo: () = {
+    "-" => (),
+    "+" => (),
+};
+
+Valor: () = {
+    <_id:Identificador> => (),
+    Constante => (),
+};
+
+Constante: () = {
+    <_c:Entero> => (),
+    <_c:Flotante> => (),
 };

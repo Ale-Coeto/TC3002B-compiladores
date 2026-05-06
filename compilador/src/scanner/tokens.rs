@@ -3,7 +3,7 @@
 use logos::Logos;
 
 #[derive(Logos, Debug, PartialEq, Clone)]
-// #[logos(skip r"[ \t\n\f]+")]
+#[logos(skip r"[ \t\n\f]+")]
 pub enum Token {
     // General
     #[token("programa")]
@@ -100,11 +100,11 @@ pub enum Token {
     Dividir,
     
     // Literales
+    #[regex(r"-?[0-9]+\.[0-9]+([eE][+-]?[0-9]+)?", |lex| lex.slice().parse::<f64>().unwrap())]
+    ConstanteFlotante(f64),
+
     #[regex(r"-?[0-9]+", |lex| lex.slice().parse::<i64>().unwrap())]
     ConstanteEntero(i64),
-
-    #[regex(r"-?[0-9]+\.[0-9]+([eE][+-]?[0.9]+)?", |lex| lex.slice().parse::<f64>().unwrap())]
-    ConstanteFlotante(f64),
 
     // Identificador y letrero
     #[regex(r#""([^"\\]|\\.)*""#, |lex| lex.slice().to_string())]    
