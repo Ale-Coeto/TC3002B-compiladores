@@ -1,5 +1,6 @@
 mod scanner;
 mod parser;
+mod semantics;
 
 use scanner::Scanner;
 use parser::Parser;
