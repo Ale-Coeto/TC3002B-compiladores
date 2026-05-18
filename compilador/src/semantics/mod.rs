@@ -10,7 +10,7 @@ pub use dir_func::DirFunc;
 pub use func_types::FuncType;
 
 pub struct Semantics {
-    type_matching: TypeMatching,
+    pub type_matching: TypeMatching,
     pub dir_func: DirFunc,
 }
 
