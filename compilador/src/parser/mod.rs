@@ -1,6 +1,8 @@
 use crate::scanner::Scanner;
 use crate::grammar::ProgramaParser;
 use crate::scanner::Token;
+use crate::semantics::Semantics;
+
 use lalrpop_util::ParseError;
 
 pub struct Parser;
@@ -12,7 +14,8 @@ impl Parser {
 
     pub fn parse(&self, input: &str) -> Result<(), ParseError<usize, Token, ()>> {
         let scanner: Scanner = Scanner::new(input);
-        let result = ProgramaParser::new().parse(scanner);
+        let mut semantics: Semantics = Semantics::new();
+        let result = ProgramaParser::new().parse(&mut semantics, scanner);
 
         result
     }

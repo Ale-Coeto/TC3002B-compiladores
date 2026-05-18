@@ -1,5 +1,8 @@
-grammar;
+grammar(semantics: &mut Semantics);
 use crate::scanner::Token;
+use crate::semantics::Semantics;
+use crate::semantics::func_types::FuncType;
+use crate::semantics::var_types::VarType;
 
 extern {
     type Location = usize;
@@ -44,9 +47,27 @@ extern {
     }
 }
 
+// Punto neurálgico 6 (final)
 pub Programa: () = {
-    "programa" <_id:Identificador> ";" OpcionesPrograma "inicio" Cuerpo "fin" => ()
+    ProgramaSemantics ProgramaIdSemantics ";" OpcionesPrograma "inicio" Cuerpo "fin" => {
+        let _ = semantics.dir_func.delete_all();
+    }
 };
+
+// Punto neurálgico 1
+pub ProgramaSemantics: () = {
+    "programa" => {
+        let _ = semantics.dir_func.create_dir_func();
+    }
+}
+
+// Punto neurálgico 2
+pub ProgramaIdSemantics: () = {
+    <_id:Identificador> => {
+        let _ = semantics.dir_func.add_func(_id.clone(), FuncType::Program);
+        let _ = semantics.dir_func.add_func(format!("global-{}", _id.clone()).to_string(), FuncType::Nula);
+    }
+}
 
 OpcionesPrograma: () = {
     Vars ListaFuncs => (),
@@ -59,7 +80,14 @@ ListaFuncs: () = {
 };
 
 Vars: () = {
-    "vars" ListaVars => (),
+    VarsNewTable ListaVars => (),
+};
+
+// Punto neurálgico 3
+VarsNewTable: () = {
+    "vars" => {
+        let _ = semantics.dir_func.create_var_table();
+    }
 };
 
 ListaVars: () = {
@@ -67,7 +95,14 @@ ListaVars: () = {
 };
 
 ListaId: () = {
-    <_id:Identificador> AgregarId => (),
+    NewVar AgregarId => (),
+};
+
+// Punto neurálgico 4
+NewVar: () = {
+    <_id:Identificador> => {
+        let _ = semantics.dir_func.add_var_name(_id.clone());
+    }
 };
 
 AgregarId: () = {
@@ -81,12 +116,23 @@ AgregarVars: () = {
 };
 
 Funcs: () = {
-    "nula" DefFunc => (),
-    Tipo DefFunc => (),
+    AddFuncSemantics DefFunc => (),
 };
 
+AddFuncSemantics: () = {
+    "nula" <_id:Identificador> => {
+        let _ = semantics.dir_func.add_func(_id.clone(), FuncType::Nula);
+    },
+    "entero" <_id:Identificador> => {
+        let _ = semantics.dir_func.add_func(_id.clone(), FuncType::Entero);
+    },
+    "flotante" <_id:Identificador> => {
+        let _ = semantics.dir_func.add_func(_id.clone(), FuncType::Flotante);
+    }
+}
+
 DefFunc: () = {
-    <_id:Identificador> "(" ListaArgs ")" "{" OpcionVars Cuerpo "}" ";" => (),
+    "(" ListaArgs ")" "{" OpcionVars Cuerpo "}" ";" => (),
 };
 
 ListaArgs: () = {
@@ -95,7 +141,14 @@ ListaArgs: () = {
 };
 
 Args: () = {
-    <_id:Identificador> ":" Tipo AgregarArgs => (),
+    ArgsVarSemantics AgregarArgs => (),
+};
+
+// Punto neurálgico 5
+ArgsVarSemantics: () = {
+    <_id:Identificador> ":" Tipo => {
+        let _ = semantics.dir_func.add_var_name(_id.clone());
+    }
 };
 
 AgregarArgs: () = {
@@ -118,8 +171,12 @@ ListaEstatuto: () = {
 };
 
 Tipo: () = {
-    "entero" => (),
-    "flotante" => (),
+    "entero" => {
+        let _ = semantics.dir_func.add_vars(VarType::Entero);
+    },
+    "flotante" => {
+        let _ = semantics.dir_func.add_vars(VarType::Flotante);
+    },
 };
 
 Estatuto: () = {

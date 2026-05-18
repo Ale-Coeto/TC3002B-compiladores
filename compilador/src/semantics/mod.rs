@@ -7,10 +7,11 @@ pub mod semantic_error;
 
 pub use type_matching::TypeMatching;
 pub use dir_func::DirFunc;
+pub use func_types::FuncType;
 
 pub struct Semantics {
     type_matching: TypeMatching,
-    dir_func: DirFunc,
+    pub dir_func: DirFunc,
 }
 
 impl Semantics {
@@ -20,4 +21,5 @@ impl Semantics {
             dir_func: DirFunc::new(),
         }
     }
+
 }

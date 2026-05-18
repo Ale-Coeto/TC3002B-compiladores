@@ -7,7 +7,7 @@ use std::collections::HashMap;
 pub struct DirFunc {
     dir_func: Option<HashMap<String, (FuncType, Option<HashMap<String, VarType>>)>>,
     curr_func: Option<String>,
-    curr_var_type: Option<VarType>,
+    curr_vars: Vec<String>,
 }
 
 impl DirFunc {
@@ -15,7 +15,7 @@ impl DirFunc {
         Self {
             dir_func: None,
             curr_func: None,
-            curr_var_type: None
+            curr_vars: Vec::new()
         }
     }
 
@@ -42,11 +42,11 @@ impl DirFunc {
         Ok(())
     }
 
-    pub fn set_curr_var(&mut self, var_type: VarType) {
-        self.curr_var_type = Some(var_type);
+    pub fn add_var_name(&mut self, name: String) {
+        self.curr_vars.push(name);
     }
 
-    pub fn add_var(&mut self, name: String) -> Result<(), SemanticError> {
+    pub fn add_vars(&mut self, var_type: VarType) -> Result<(), SemanticError> {
         let dir_func = self.dir_func.as_mut()
             .ok_or(SemanticError { message: "No dir_func created".to_string() })?;
 
@@ -59,14 +59,12 @@ impl DirFunc {
         let var_table = func_row.1.as_mut()
             .ok_or(SemanticError { message: "Var table not created".to_string() })?;
 
-        if var_table.contains_key(&name) {
-            return Err(SemanticError { message: "Duplicate Variable".to_string() });
+        for name in self.curr_vars.drain(..) {
+            if var_table.contains_key(&name) {
+                return Err(SemanticError { message: "Duplicate Variable".to_string() });
+            }
+            var_table.insert(name, var_type.clone());
         }
-
-        let var_type = self.curr_var_type.clone()
-            .ok_or(SemanticError { message: "No current var type".to_string() })?;
-
-        var_table.insert(name, var_type);
         Ok(())
     }
 
@@ -76,7 +74,7 @@ impl DirFunc {
         
         dir_func.clear();
         self.curr_func = None;
-        self.curr_var_type = None;
+        self.curr_vars.clear();
         Ok(())
     }
     
