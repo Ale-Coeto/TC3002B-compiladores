@@ -7,11 +7,12 @@ pub mod semantic_error;
 
 pub use type_matching::TypeMatching;
 pub use dir_func::DirFunc;
-pub use func_types::FuncType;
+pub use semantic_error::SemanticError;
 
 pub struct Semantics {
     pub type_matching: TypeMatching,
     pub dir_func: DirFunc,
+    errors: Vec::<SemanticError>,
 }
 
 impl Semantics {
@@ -19,7 +20,12 @@ impl Semantics {
         Self {
             type_matching: TypeMatching::new(),
             dir_func: DirFunc::new(),
+            errors: Vec::<SemanticError>::new(),
         }
+    }
+
+    pub fn get_errors(&self) -> &Vec::<SemanticError> {
+        return &self.errors;
     }
 
 }

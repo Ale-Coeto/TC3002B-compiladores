@@ -1,19 +1,28 @@
 use crate::semantics::var_types::VarType;
 use crate::quads::quad_value::QuadValue;
+use std::sync::{Mutex, OnceLock};
+use std::collections::HashMap;
 
 pub const INT_MEMORY_SIZE: usize = 500;
 pub const FLOAT_MEMORY_SIZE: usize = 500;
 pub const BOOL_MEMORY_SIZE: usize = 500;
+pub const CONSTANTS_MEMORY_SIZE: usize = 500;
 
 pub struct MemoryManager {
     int_memory: [i64; INT_MEMORY_SIZE],
     float_memory: [f64; FLOAT_MEMORY_SIZE],
     bool_memory: [bool; BOOL_MEMORY_SIZE],
 
+    constants_memory: [QuadValue; CONSTANTS_MEMORY_SIZE],
+    constants_dir: HashMap<i64, QuadValue>,
+
     int_memory_index: i64,
     float_memory_index: i64,
     bool_memory_index: i64,
+    constants_memory_index: i64,
 }
+
+static MEMORY_MANAGER: OnceLock<Mutex<MemoryManager>> = OnceLock::new();
 
 impl MemoryManager {
     pub fn new() -> Self {
@@ -21,11 +30,35 @@ impl MemoryManager {
             int_memory: [0; INT_MEMORY_SIZE],
             float_memory: [0.0; FLOAT_MEMORY_SIZE],
             bool_memory: [false; BOOL_MEMORY_SIZE],
+            constants_memory: [QuadValue::Entero(0); CONSTANTS_MEMORY_SIZE],
+            constants_dir: HashMap::new(),
 
             int_memory_index: 0,
             float_memory_index: 0,
             bool_memory_index: 0,
+            constants_memory_index: 0,
         }
+    }
+
+    pub fn instance() -> &'static Mutex<MemoryManager> {
+        MEMORY_MANAGER.get_or_init(|| Mutex::new(MemoryManager::new()))
+    }
+
+    pub fn with_instance<R>(f: impl FnOnce(&mut MemoryManager) -> R) -> R {
+        let mut guard = Self::instance()
+            .lock()
+            .expect("MemoryManager mutex poisoned");
+        f(&mut guard)
+    }
+
+    pub fn reset(&mut self) {
+        self.int_memory = [0; INT_MEMORY_SIZE];
+        self.float_memory = [0.0; FLOAT_MEMORY_SIZE];
+        self.bool_memory = [false; BOOL_MEMORY_SIZE];
+        self.int_memory_index = 0;
+        self.float_memory_index = 0;
+        self.bool_memory_index = 0;
+        self.constants_memory_index = 0;
     }
 
     pub fn save_in_memory(&mut self, value: QuadValue) -> i64 {
@@ -51,10 +84,38 @@ impl MemoryManager {
         }
     }
 
+    pub fn save_constant(&mut self, value: QuadValue) -> i64 {
+        let address = self.constants_memory_index;
+        self.constants_memory[address as usize] = value;
+        self.constants_memory_index += 1;
+        (INT_MEMORY_SIZE + FLOAT_MEMORY_SIZE + BOOL_MEMORY_SIZE) as i64 + address
+    }
+
+    pub fn get_available_address(&mut self, var_type: VarType) -> i64 {
+        match var_type {
+            VarType::Entero => {
+                let address = self.int_memory_index;
+                self.int_memory_index += 1;
+                address
+            }
+            VarType::Flotante => {
+                let address = self.float_memory_index;
+                self.float_memory_index += 1;
+                (INT_MEMORY_SIZE as i64) + address
+            }
+            VarType::Boleano => {
+                let address = self.bool_memory_index;
+                self.bool_memory_index += 1;
+                (INT_MEMORY_SIZE + FLOAT_MEMORY_SIZE) as i64 + address
+            }
+        }
+    }
+
     pub fn get_from_memory(&self, address: i64) -> QuadValue {
         let int_limit = INT_MEMORY_SIZE as i64;
         let float_limit = int_limit + (FLOAT_MEMORY_SIZE as i64);
         let bool_limit = float_limit + (BOOL_MEMORY_SIZE as i64);
+        let constant_limit = bool_limit + (CONSTANTS_MEMORY_SIZE as i64);
 
         match address {
             addr if addr >= 0 && addr < int_limit => {
@@ -68,6 +129,10 @@ impl MemoryManager {
             addr if addr >= float_limit && addr < bool_limit => {
                 let index = (addr - float_limit) as usize;
                 QuadValue::Boleano(self.bool_memory[index])
+            }
+            addr if addr >= bool_limit && addr < constant_limit => {
+                let index = (addr - bool_limit) as usize;
+                self.constants_memory[index].clone()
             }
             _ => panic!("Error en tiempo de ejecución: Dirección de memoria {} fuera de rango", address),
         }

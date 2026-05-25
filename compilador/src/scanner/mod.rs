@@ -18,7 +18,7 @@ impl<'a> Scanner<'a> {
         }
     }
 
-    fn get_errors(&self) -> &Vec<LexError> {
+    pub fn get_errors(&self) -> &Vec<LexError> {
         &self.errors
     }
 }

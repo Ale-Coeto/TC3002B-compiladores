@@ -1,3 +1,4 @@
+use crate::memory::MemoryManager;
 use crate::semantics::func_types::FuncType;
 use crate::semantics::var_types::VarType;
 use crate::semantics::semantic_error::SemanticError;
@@ -5,7 +6,7 @@ use crate::semantics::semantic_error::SemanticError;
 use std::collections::HashMap;
 
 pub struct DirFunc {
-    dir_func: Option<HashMap<String, (FuncType, Option<HashMap<String, VarType>>)>>,
+    dir_func: Option<HashMap<String, (FuncType, Option<HashMap<String, (i64, VarType)>>)>>,
     curr_func: Option<String>,
     curr_vars: Vec<String>,
 }
@@ -15,7 +16,7 @@ impl DirFunc {
         Self {
             dir_func: None,
             curr_func: None,
-            curr_vars: Vec::new()
+            curr_vars: Vec::new(),
         }
     }
 
@@ -61,11 +62,30 @@ impl DirFunc {
 
         for name in self.curr_vars.drain(..) {
             if var_table.contains_key(&name) {
+                println!("VARIABLE DUPLICADA");
                 return Err(SemanticError { message: "Duplicate Variable".to_string() });
             }
-            var_table.insert(name, var_type.clone());
+            let address = MemoryManager::with_instance(|memory_manager| {
+                memory_manager.get_available_address(var_type)
+            });
+            var_table.insert(name, (address, var_type));
         }
         Ok(())
+    }
+
+    pub fn get_var_info(&self, name: &String) -> Result<(i64, VarType), SemanticError> {
+        let dir_func = self.dir_func.as_ref()
+            .ok_or(SemanticError { message: "No dir_func created".to_string() })?;
+        let curr_func = self.curr_func.as_ref()
+            .ok_or(SemanticError { message: "No current function".to_string() })?;
+
+        let func_row = dir_func.get(curr_func)
+            .ok_or(SemanticError { message: "Function not found".to_string() })?;
+        let var_table = func_row.1.as_ref()
+            .ok_or(SemanticError { message: "Var table not created".to_string() })?;
+
+        var_table.get(name).copied()
+            .ok_or(SemanticError { message: format!("Variable '{}' not found", name) })
     }
 
     pub fn delete_all(&mut self) -> Result<(), SemanticError> {
@@ -82,8 +102,23 @@ impl DirFunc {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, MutexGuard, OnceLock};
+
+    static TEST_GUARD: OnceLock<Mutex<()>> = OnceLock::new();
+
+    fn test_guard() -> MutexGuard<'static, ()> {
+        TEST_GUARD
+            .get_or_init(|| Mutex::new(()))
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    fn reset_memory_manager() {
+        MemoryManager::with_instance(|memory_manager| memory_manager.reset());
+    }
 
     fn setup_dir_func_with_program() -> DirFunc {
+        reset_memory_manager();
         let mut dir_func = DirFunc::new();
         dir_func.create_dir_func();
         dir_func.add_func("programa_principal".to_string(), FuncType::Program).unwrap();
@@ -95,6 +130,7 @@ mod tests {
 
         #[test]
         fn test_01_01_new_starts_empty() {
+            let _guard = test_guard();
             let dir_func = DirFunc::new();
 
             assert!(dir_func.dir_func.is_none());
@@ -104,6 +140,7 @@ mod tests {
 
         #[test]
         fn test_01_02_create_dir_func_creates_table() {
+            let _guard = test_guard();
             let mut dir_func = DirFunc::new();
 
             dir_func.create_dir_func();
@@ -117,6 +154,7 @@ mod tests {
 
         #[test]
         fn test_02_01_success_sets_current_function() {
+            let _guard = test_guard();
             let mut dir_func = DirFunc::new();
             dir_func.create_dir_func();
 
@@ -130,6 +168,7 @@ mod tests {
 
         #[test]
         fn test_02_02_errors_without_dir_func() {
+            let _guard = test_guard();
             let mut dir_func = DirFunc::new();
 
             let error = dir_func
@@ -145,6 +184,7 @@ mod tests {
 
         #[test]
         fn test_03_01_success() {
+            let _guard = test_guard();
             let mut dir_func = setup_dir_func_with_program();
 
             dir_func.create_var_table().unwrap();
@@ -155,6 +195,7 @@ mod tests {
 
         #[test]
         fn test_03_02_errors_without_dir_func() {
+            let _guard = test_guard();
             let mut dir_func = DirFunc::new();
 
             let error = dir_func.create_var_table().unwrap_err();
@@ -164,6 +205,7 @@ mod tests {
 
         #[test]
         fn test_03_03_errors_without_current_function() {
+            let _guard = test_guard();
             let mut dir_func = DirFunc::new();
             dir_func.create_dir_func();
 
@@ -178,6 +220,7 @@ mod tests {
 
         #[test]
         fn test_04_01_success_pushes_name() {
+            let _guard = test_guard();
             let mut dir_func = DirFunc::new();
 
             dir_func.add_var_name("x".to_string());
@@ -191,6 +234,7 @@ mod tests {
 
         #[test]
         fn test_05_01_success_inserts_all_and_clears_buffer() {
+            let _guard = test_guard();
             let mut dir_func = setup_dir_func_with_program();
             dir_func.create_var_table().unwrap();
             dir_func.add_var_name("x".to_string());
@@ -208,13 +252,14 @@ mod tests {
                 .as_ref()
                 .unwrap();
 
-            assert_eq!(var_table.get("x"), Some(&VarType::Flotante));
-            assert_eq!(var_table.get("y"), Some(&VarType::Flotante));
+            assert_eq!(var_table.get("x"), Some(&(500, VarType::Flotante)));
+            assert_eq!(var_table.get("y"), Some(&(501, VarType::Flotante)));
             assert!(dir_func.curr_vars.is_empty());
         }
 
         #[test]
         fn test_05_02_errors_without_var_table() {
+            let _guard = test_guard();
             let mut dir_func = setup_dir_func_with_program();
             dir_func.add_var_name("x".to_string());
 
@@ -225,6 +270,7 @@ mod tests {
 
         #[test]
         fn test_05_03_errors_on_duplicate() {
+            let _guard = test_guard();
             let mut dir_func = setup_dir_func_with_program();
             dir_func.create_var_table().unwrap();
             dir_func.add_var_name("x".to_string());
@@ -235,6 +281,18 @@ mod tests {
 
             assert_eq!(error, SemanticError { message: "Duplicate Variable".to_string() });
         }
+
+        #[test]
+        fn test_05_04_get_var_info_returns_address_and_type() {
+            let _guard = test_guard();
+            let mut dir_func = setup_dir_func_with_program();
+            dir_func.create_var_table().unwrap();
+            dir_func.add_var_name("x".to_string());
+            dir_func.add_vars(VarType::Entero).unwrap();
+
+            let var_name = "x".to_string();
+            assert_eq!(dir_func.get_var_info(&var_name), Ok((0, VarType::Entero)));
+        }
     }
 
     mod delete_all {
@@ -242,6 +300,7 @@ mod tests {
 
         #[test]
         fn test_06_01_success_clears_everything() {
+            let _guard = test_guard();
             let mut dir_func = setup_dir_func_with_program();
             dir_func.create_var_table().unwrap();
             dir_func.add_var_name("x".to_string());
@@ -255,6 +314,7 @@ mod tests {
 
         #[test]
         fn test_06_02_errors_without_dir_func() {
+            let _guard = test_guard();
             let mut dir_func = DirFunc::new();
 
             let error = dir_func.delete_all().unwrap_err();

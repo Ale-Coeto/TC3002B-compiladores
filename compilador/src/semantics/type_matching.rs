@@ -1,18 +1,19 @@
-use crate::semantics::var_types::VarType;
+use crate::semantics::var_types::{VarType, VAR_TYPE_COUNT};
 use crate::semantics::operators::{Operator, OP_COUNT};
 
 pub struct TypeMatching {
-    table: [[[Option<VarType>; OP_COUNT]; 2]; 2]
+    table: [[[Option<VarType>; OP_COUNT]; VAR_TYPE_COUNT]; VAR_TYPE_COUNT]
 }
 
 impl TypeMatching {
     pub fn new() -> Self {
         let mut table = Self {
-            table: [[[None; OP_COUNT]; 2]; 2],
+            table: [[[None; OP_COUNT]; VAR_TYPE_COUNT]; VAR_TYPE_COUNT],
         };
 
         let integer = VarType::Entero;
         let float = VarType::Flotante;
+        let boolean = VarType::Boleano;
 
         for operator in [Operator::Mas, Operator::Menos, Operator::Multiplicar, Operator::Dividir] {
             table.insert(integer, integer, operator, integer);
@@ -27,10 +28,10 @@ impl TypeMatching {
             Operator::Mayor,
             Operator::Menor,
         ] {
-            table.insert(integer, integer, operator, integer);
-            table.insert(integer, float, operator, integer);
-            table.insert(float, integer, operator, integer);
-            table.insert(float, float, operator, integer);
+            table.insert(integer, integer, operator, boolean);
+            table.insert(integer, float, operator, boolean);
+            table.insert(float, integer, operator, boolean);
+            table.insert(float, float, operator, boolean);
         }
 
         table
@@ -80,7 +81,7 @@ mod tests {
     }
 
     #[test]
-    fn comparison_int_int_returns_int() {
+    fn comparison_int_int_returns_boolean() {
         let table = TypeMatching::new();
 
         for operator in [
@@ -89,12 +90,12 @@ mod tests {
             Operator::Mayor,
             Operator::Menor,
         ] {
-            assert_result(&table, VarType::Entero, VarType::Entero, operator, VarType::Entero);
+            assert_result(&table, VarType::Entero, VarType::Entero, operator, VarType::Boleano);
         }
     }
 
     #[test]
-    fn comparison_all_type_combinations_return_int() {
+    fn comparison_all_type_combinations_return_boolean() {
         let table = TypeMatching::new();
 
         for operator in [
@@ -103,9 +104,9 @@ mod tests {
             Operator::Mayor,
             Operator::Menor,
         ] {
-            assert_result(&table, VarType::Entero, VarType::Flotante, operator, VarType::Entero);
-            assert_result(&table, VarType::Flotante, VarType::Entero, operator, VarType::Entero);
-            assert_result(&table, VarType::Flotante, VarType::Flotante, operator, VarType::Entero);
+            assert_result(&table, VarType::Entero, VarType::Flotante, operator, VarType::Boleano);
+            assert_result(&table, VarType::Flotante, VarType::Entero, operator, VarType::Boleano);
+            assert_result(&table, VarType::Flotante, VarType::Flotante, operator, VarType::Boleano);
         }
     }
 }

@@ -2,6 +2,7 @@ use crate::scanner::Scanner;
 use crate::grammar::ProgramaParser;
 use crate::scanner::Token;
 use crate::semantics::Semantics;
+use crate::quads::QuadGenerator;
 
 use lalrpop_util::ParseError;
 
@@ -13,9 +14,23 @@ impl Parser {
     }
 
     pub fn parse(&self, input: &str) -> Result<(), ParseError<usize, Token, ()>> {
-        let scanner: Scanner = Scanner::new(input);
+        let mut scanner: Scanner = Scanner::new(input);
         let mut semantics: Semantics = Semantics::new();
-        let result = ProgramaParser::new().parse(&mut semantics, scanner);
+        let mut quad_generator: QuadGenerator = QuadGenerator::new();
+        let result = ProgramaParser::new().parse(&mut semantics, &mut quad_generator, &mut scanner);
+
+        let lex_errors = scanner.get_errors();
+        for error in lex_errors {
+            println!("{} {}", error.start, error.end);
+        }
+        
+        let semantic_errors = semantics.get_errors();
+        for error in semantic_errors {
+            println!("{}", error.message);
+        }
+
+        println!("Saving results");
+        quad_generator.save_results();
 
         result
     }
@@ -339,8 +354,8 @@ mod tests {
         fn test_07_03_factor_identificador_con_y_sin_signo() {
             let cases = [
                 "x1 = + var1 ;",
-                "x1 = - var1 ;",
-                "x1 = var1 ;",
+                "x2 = - var1 ;",
+                "x3 = var1 ;",
             ];
 
             let parser: Parser = Parser::new();

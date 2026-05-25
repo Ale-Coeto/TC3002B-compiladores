@@ -1,8 +1,12 @@
-grammar(semantics: &mut Semantics);
+grammar(semantics: &mut Semantics, quad_generator: &mut QuadGenerator);
 use crate::scanner::Token;
 use crate::semantics::Semantics;
+use crate::quads::QuadGenerator;
 use crate::semantics::func_types::FuncType;
 use crate::semantics::var_types::VarType;
+use crate::quads::operator_group::OperatorGroup;
+use crate::quads::quad_operators::QuadOperator;
+use crate::quads::quad_value::QuadValue;
 
 extern {
     type Location = usize;
@@ -180,7 +184,7 @@ Tipo: () = {
 };
 
 Estatuto: () = {
-    <_id:Identificador> AsignaOLlamada => (),
+    PushId AsignaOLlamada => (),
     Condicion => (),
     Ciclo => (),
     Imprime => (),
@@ -193,7 +197,10 @@ ListaEstatutoAdentro: () = {
 };
 
 AsignaOLlamada: () = {
-    "=" Expresion ";" => (),
+    // Punto neurálgico Quads 8
+    "=" Expresion ";" => {
+        quad_generator.equals_quad();
+    },
     LlamadaSinId => (),
 };
 
@@ -251,10 +258,10 @@ Expresion: () = {
 };
 
 OpcionExp: () = {
-    ">" Exp => (),
-    "<" Exp => (),
-    "!=" Exp => (),
-    "==" Exp => (),
+    PushMayor Exp ChecarRel => (),
+    PushMenor Exp ChecarRel => (),
+    PushNoIgual Exp ChecarRel => (),
+    PushIgual Exp ChecarRel => (),
     => (),
 };
 
@@ -262,27 +269,121 @@ Exp: () = {
     Termino AgregarTermino => (),
 };
 
+// Punto neurálgico Quads 4
+pub ChecarSumSub: () = {
+    => { 
+        quad_generator.check_operator(OperatorGroup::SumSub)
+    }
+};
+
 AgregarTermino: () = {
-    "+" Exp => (),
-    "-" Exp => (),
+    // Punto neurálgico Quads 3
+    PushMas Termino ChecarSumSub AgregarTermino => (),
+    // Punto neurálgico Quads 3
+    PushMenos Termino ChecarSumSub AgregarTermino => (),
     => (),
 };
+
+// Punto neurálgico Quads 3
+pub PushMas: () = {
+    "+" => {
+        quad_generator.push_operator(QuadOperator::Mas);
+    }
+}
+
+// Punto neurálgico Quads 3
+pub PushMenos: () = {
+    "-" => {
+        quad_generator.push_operator(QuadOperator::Menos);
+    }
+}
 
 Termino: () = {
     Factor AgregarFactor => (),
 };
 
+// Punto neurálgico Quads 6
+pub ChecarMultDiv: () = {
+    => {
+        quad_generator.check_operator(OperatorGroup::MultDiv)
+    }
+};
+
 AgregarFactor: () = {
-    "*" Termino => (),
-    "/" Termino => (),
+    // Punto neurálgico Quads 5
+    PushMult Factor ChecarMultDiv AgregarFactor => (),
+    // Punto neurálgico Quads 5
+    PushDiv Factor ChecarMultDiv AgregarFactor => (),
     => (),
 };
+
+// Punto neurálgico Quads 5
+pub PushMult: () = {
+    "*" => {
+        quad_generator.push_operator(QuadOperator::Multiplicar);
+    }
+}
+
+// Punto neurálgico Quads 5
+pub PushDiv: () = {
+    "/" => {
+        quad_generator.push_operator(QuadOperator::Dividir);
+    }
+}
+
+// Punto neurálgico Quads 7
+pub ChecarRel: () = {
+    => {
+        quad_generator.check_operator(OperatorGroup::Rel)
+    }
+};
+
+// Punto neurálgico Quads 7
+pub PushMayor: () = {
+    ">" => {
+        quad_generator.push_operator(QuadOperator::Mayor);
+    }
+}
+
+
+// Punto neurálgico Quads 7
+pub PushMenor: () = {
+    "<" => {
+        quad_generator.push_operator(QuadOperator::Menor);
+    }
+}
+
+
+// Punto neurálgico Quads 7
+pub PushNoIgual: () = {
+    "!=" => {
+        quad_generator.push_operator(QuadOperator::NoIgual);
+    }
+}
+
+
+// Punto neurálgico Quads 7
+pub PushIgual: () = {
+    "==" => {
+        quad_generator.push_operator(QuadOperator::ComparadorIgual);
+    }
+}
 
 Factor: () = {
     "(" Expresion ")" => (),
     Signo Valor => (),
-    Constante => (),
-    <_id:Identificador> OpcionFactorId=> (),
+    // Punto neurálgico Quads 2
+    <_c:Constante> => { quad_generator.push_constante(_c); },
+    PushId OpcionFactorId=> (),
+};
+
+// Punto neurálgico Quads 1
+pub PushId: () = {
+    <_id:Identificador> => {
+        if let Ok((address, var_type)) = semantics.dir_func.get_var_info(&_id.clone()) {
+            quad_generator.push_id(address, var_type);
+        }
+    }
 };
 
 OpcionFactorId: () = {
@@ -297,10 +398,14 @@ Signo: () = {
 
 Valor: () = {
     <_id:Identificador> => (),
-    Constante => (),
+    <_c:Constante> => (),
 };
 
-Constante: () = {
-    <_c:Entero> => (),
-    <_c:Flotante> => (),
+Constante: QuadValue = {
+    <_c:Entero> => { 
+        QuadValue::Entero(_c) 
+    },
+    <_c:Flotante> => { 
+        QuadValue::Flotante(_c) 
+    },
 };

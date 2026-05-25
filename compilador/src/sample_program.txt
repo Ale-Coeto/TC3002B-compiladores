@@ -1,0 +1,9 @@
+programa main ;
+vars a , b , c, d, e, f, h : entero; g : flotante ;
+inicio
+{
+    f = 3 + 5;
+    g = g * g;
+    a = b + c  * (d-e / f) * h;
+}
+fin
