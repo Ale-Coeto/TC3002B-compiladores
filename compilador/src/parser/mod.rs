@@ -13,7 +13,7 @@ impl Parser {
         Parser
     }
 
-    pub fn parse(&self, input: &str) -> Result<(), ParseError<usize, Token, ()>> {
+    pub fn parse(&self, input: &str) -> Result<Vec<String>, ParseError<usize, Token, ()>> {
         let mut scanner: Scanner = Scanner::new(input);
         let mut semantics: Semantics = Semantics::new();
         let mut quad_generator: QuadGenerator = QuadGenerator::new();
@@ -30,9 +30,12 @@ impl Parser {
         }
 
         println!("Saving results");
+
+        let quads = quad_generator.get_results();
         quad_generator.save_results();
 
-        result
+        let _ = result;
+        Ok(quads)
     }
 }
 

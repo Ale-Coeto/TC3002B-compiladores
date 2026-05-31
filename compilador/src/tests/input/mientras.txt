@@ -1,0 +1,10 @@
+programa main ;
+vars a : entero ;
+inicio
+{
+    mientras ( 1 < 2 ) haz { 
+        a = 4;
+    } ;
+    a = 5;
+}
+fin

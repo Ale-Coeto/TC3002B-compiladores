@@ -17,16 +17,16 @@ pub struct Quad {
     operator: QuadOperator,
     left_operand: Option<(i64, VarType)>,
     right_operand: Option<(i64, VarType)>,
-    result: (i64, VarType),
+    result: Option<(i64, VarType)>,
 }
 
 impl Quad {
-    pub fn new(id: i64, operator: QuadOperator, left_operand: (i64, VarType), right_operand: (i64, VarType), result: (i64, VarType)) -> Self {
+    pub fn new(id: i64, operator: QuadOperator, left_operand: Option<(i64, VarType)>, right_operand: Option<(i64, VarType)>, result: Option<(i64, VarType)>) -> Self {
         Self {
             id: id,
             operator: operator,
-            left_operand: Some(left_operand),
-            right_operand: Some(right_operand),
+            left_operand: left_operand,
+            right_operand: right_operand,
             result: result,
         }
     }
@@ -50,6 +50,55 @@ impl QuadGenerator {
             quad_queue: VecDeque::new(),
             counter: 0,
             type_matching: TypeMatching::new(),
+        }
+    }
+
+    fn quad_operator_to_string(operator: QuadOperator) -> &'static str {
+        match operator {
+            QuadOperator::Mas => "+",
+            QuadOperator::Menos => "-",
+            QuadOperator::Multiplicar => "*",
+            QuadOperator::Dividir => "/",
+            QuadOperator::ComparadorIgual => "==",
+            QuadOperator::NoIgual => "!=",
+            QuadOperator::Mayor => ">",
+            QuadOperator::Menor => "<",
+            QuadOperator::Asignacion => "=",
+            QuadOperator::Imprime => "print",
+            QuadOperator::GoTo => "goto",
+            QuadOperator::GoToV => "gotov",
+            QuadOperator::GoToF => "gotof",
+            QuadOperator::OpenParenthesis => "open_paren",
+            QuadOperator::CloseParenthesis => "close_paren",
+        }
+    }
+
+    fn quad_to_string(quad: &Quad) -> String {
+        let operator = Self::quad_operator_to_string(quad.operator);
+        let left_address = quad.left_operand.as_ref().map(|operand| operand.0).unwrap_or(-1);
+        let right_address = quad.right_operand.as_ref().map(|operand| operand.0).unwrap_or(-1);
+        let result_address = quad.result.as_ref().map(|operand| operand.0).unwrap_or(-1);
+
+        format!("{} {} {} {}", operator, left_address, right_address, result_address)
+    }
+
+    pub fn push_start(&mut self) {
+        self.quad_queue.push_back(Quad::new(
+            self.counter,
+            QuadOperator::GoTo,
+            None,
+            None,
+            None
+        ));
+        self.jumps_stack.push(self.counter);
+        self.counter += 1;
+    }
+
+    pub fn push_main(&mut self) {
+        if let Some(pending_jump) = self.jumps_stack.pop() {
+            if let Some(q) = self.quad_queue.get_mut(pending_jump as usize) {
+                q.result = Some((self.counter, VarType::Entero));
+            }
         }
     }
 
@@ -83,7 +132,7 @@ impl QuadGenerator {
                     operator: QuadOperator::Asignacion,
                     left_operand: Some((right_addr, right_type)),
                     right_operand: None,
-                    result: (left_addr, left_type),
+                    result: Some((left_addr, left_type)),
                 };
                 self.quad_queue.push_back(quad);
                 self.counter += 1;
@@ -108,9 +157,9 @@ impl QuadGenerator {
                             self.quad_queue.push_back(Quad::new(
                                 self.counter,
                                 operator,
-                                (left_addr, left_type),
-                                (right_addr, right_type),
-                                (new_address, result_type),
+                                Some((left_addr, left_type)),
+                                Some((right_addr, right_type)),
+                                Some((new_address, result_type)),
                             ));
                             self.counter += 1;
                             self.variable_stack.push((new_address, result_type));
@@ -121,38 +170,104 @@ impl QuadGenerator {
         }
     }
 
-    pub fn save_results(&mut self) {
+    pub fn push_if_start(&mut self) {
+        if let Some((top_variable, top_type)) = self.variable_stack.pop() {
+            if top_type != VarType::Boleano {
+                println!("TYPE Mismatch");
+            } else {
+                self.quad_queue.push_back(Quad::new(
+                    self.counter,
+                    QuadOperator::GoToF,
+                    Some((top_variable, top_type)),
+                    None,
+                    None,
+                ));
+                self.jumps_stack.push(self.counter);
+                self.counter += 1;
+            }
+        }
+    }
+
+    pub fn push_else(&mut self) {
+        self.quad_queue.push_back(Quad::new(
+            self.counter,
+            QuadOperator::GoTo,
+            None,
+            None,
+            None,
+        ));
+
+        if let Some(pending_jump) = self.jumps_stack.pop() {
+            if let Some(q) = self.quad_queue.get_mut(pending_jump as usize) {
+                q.result = Some((self.counter+1, VarType::Entero));
+            }
+        }
+
+        self.jumps_stack.push(self.counter);
+        self.counter += 1;
+    }
+
+    pub fn push_if_end(&mut self) {
+        if let Some(pending_jump) = self.jumps_stack.pop() {
+            if let Some(q) = self.quad_queue.get_mut(pending_jump as usize) {
+                q.result = Some((self.counter, VarType::Entero));
+            }
+        }
+    }
+
+    pub fn push_while_start(&mut self) {
+        self.jumps_stack.push(self.counter);
+    }
+
+    pub fn push_while_expression(&mut self) {
+        if let Some((top_variable, top_type)) = self.variable_stack.pop() {
+            if top_type != VarType::Boleano {
+                println!("TYPE Mismatch"); 
+            } else {
+                self.quad_queue.push_back(Quad::new(
+                    self.counter,
+                    QuadOperator::GoToF,
+                    Some((top_variable, top_type)),
+                    None,
+                    None,
+                ));
+                self.jumps_stack.push(self.counter);
+                self.counter += 1;
+            }
+        }
+    }
+
+    pub fn push_while_end(&mut self) {
+        if let (Some(pending_jump), Some(return_id)) = (self.jumps_stack.pop(), self.jumps_stack.pop()) {
+            self.quad_queue.push_back(Quad::new(
+                self.counter,
+                QuadOperator::GoTo,
+                None,
+                None,
+                Some((return_id, VarType::Entero)),
+            ));
+            if let Some(q) = self.quad_queue.get_mut(pending_jump as usize) {
+                q.result = Some((self.counter+1, VarType::Entero));
+            }
+            self.counter += 1;
+        }
+    }
+
+    pub fn push_
+
+    pub fn get_results(&self) -> Vec<String> {
+        self.quad_queue.iter().map(Self::quad_to_string).collect()
+    }
+
+    pub fn save_results(&self) {
         let file = File::create("quads.txt").expect("unable to create quads.txt");
         let mut writer = BufWriter::new(file);
 
         writeln!(writer, "operator left_address right_address result_address")
             .expect("unable to write quads header");
 
-        for quad in &self.quad_queue {
-            let operator = match quad.operator {
-                QuadOperator::Mas => "+",
-                QuadOperator::Menos => "-",
-                QuadOperator::Multiplicar => "*",
-                QuadOperator::Dividir => "/",
-                QuadOperator::ComparadorIgual => "==",
-                QuadOperator::NoIgual => "!=",
-                QuadOperator::Mayor => ">",
-                QuadOperator::Menor => "<",
-                QuadOperator::Asignacion => "=",
-                QuadOperator::Imprime => "print",
-                QuadOperator::GoTo => "goto",
-                QuadOperator::GoToV => "gotov",
-                QuadOperator::GoToF => "gotof",
-                QuadOperator::OpenParenthesis => "open_paren",
-                QuadOperator::CloseParenthesis => "close_paren",
-            };
-
-            let left_address = quad.left_operand.as_ref().map(|operand| operand.0).unwrap_or(-1);
-            let right_address = quad.right_operand.as_ref().map(|operand| operand.0).unwrap_or(-1);
-            let result_address = quad.result.0;
-
-            writeln!(writer, "{} {} {} {}", operator, left_address, right_address, result_address)
-                .expect("unable to write quad row");
+        for line in self.get_results() {
+            writeln!(writer, "{}", line).expect("unable to write quad row");
         }
 
         writer.flush().expect("unable to flush quads.txt");

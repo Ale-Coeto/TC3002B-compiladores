@@ -7,6 +7,7 @@ use crate::semantics::var_types::VarType;
 use crate::quads::operator_group::OperatorGroup;
 use crate::quads::quad_operators::QuadOperator;
 use crate::quads::quad_value::QuadValue;
+use crate::memory::MemoryManager;
 
 extern {
     type Location = usize;
@@ -53,14 +54,16 @@ extern {
 
 // Punto neurálgico 6 (final)
 pub Programa: () = {
-    ProgramaSemantics ProgramaIdSemantics ";" OpcionesPrograma "inicio" Cuerpo "fin" => {
+    ProgramaSemantics ProgramaIdSemantics ";" OpcionesPrograma Inicio Cuerpo "fin" => {
         let _ = semantics.dir_func.delete_all();
+        MemoryManager::with_instance(|memory_manager| memory_manager.reset());
     }
 };
 
 // Punto neurálgico 1
 pub ProgramaSemantics: () = {
     "programa" => {
+        quad_generator.push_start();
         let _ = semantics.dir_func.create_dir_func();
     }
 }
@@ -70,6 +73,13 @@ pub ProgramaIdSemantics: () = {
     <_id:Identificador> => {
         let _ = semantics.dir_func.add_func(_id.clone(), FuncType::Program);
         let _ = semantics.dir_func.add_func(format!("global-{}", _id.clone()).to_string(), FuncType::Nula);
+    }
+}
+
+// Punto neurálgico 7
+pub Inicio: () = {
+    "inicio" => {
+        quad_generator.push_main();
     }
 }
 
@@ -205,16 +215,58 @@ AsignaOLlamada: () = {
 };
 
 Condicion: () = {
-    "si" "(" Expresion ")" Cuerpo OpcionSino ";" => (),
+    "si" "(" Expresion IfStart Cuerpo OpcionSino IfEnd => (),
+};
+
+// Punto neurálgico If 1
+pub IfStart: () = {
+    ")" => {
+        quad_generator.push_if_start();
+    }
+};
+
+// Punto neurálgico If 2
+pub IfEnd: () = {
+    ";" => {
+        quad_generator.push_if_end();
+    }
 };
 
 OpcionSino: () = {
-    "sino" Cuerpo => (),
+    Else Cuerpo => (),
     => (),
 };
 
+// Punto neurálgico If 3
+pub Else: () = {
+    "sino" => {
+        quad_generator.push_else();
+    }
+};
+
 Ciclo: () = {
-    "mientras" "(" Expresion ")" "haz" Cuerpo ";" => (),
+    WhileStart "(" Expresion ")" WhileExpression Cuerpo WhileEnd => (),
+};
+
+// Punto neurálgico While 1
+pub WhileStart: () = {
+    "mientras"=> {
+        quad_generator.push_while_start();
+    }
+};
+
+// Punto neurálgico While 2
+pub WhileExpression: () = {
+    "haz" => {
+        quad_generator.push_while_expression();
+    }
+};
+
+// Punto neurálgico While 3
+pub WhileEnd: () = {
+    ";" => {
+        quad_generator.push_while_end();
+    }
 };
 
 LlamadaSinId: () = {

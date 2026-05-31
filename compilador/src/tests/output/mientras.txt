@@ -1,4 +1,3 @@
-operator left_address right_address result_address
 goto -1 -1 1
 < 6000 6001 5000
 gotof 5000 -1 5

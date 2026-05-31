@@ -18,13 +18,6 @@ pub const CONSTANTS_START: i64 = 6000;
 const GLOBAL_LOCAL_MEMORY_SIZE: i64 = 500;
 const TEMP_MEMORY_SIZE: i64 = 1000;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum ConstantKey {
-    Entero(i64),
-    Flotante(u64),
-    Boleano(bool),
-}
-
 pub struct MemoryManager {
     int_global_index: i64,
     int_local_index: i64,
@@ -34,7 +27,8 @@ pub struct MemoryManager {
     float_temp_index: i64,
     bool_temp_index: i64,
     constants_index: i64,
-    constants_dir: HashMap<ConstantKey, i64>,
+    int_constants_dir: HashMap<i64, i64>,
+    float_constants_dir: HashMap<u64, i64>,
 }
 
 static MEMORY_MANAGER: OnceLock<Mutex<MemoryManager>> = OnceLock::new();
@@ -50,7 +44,8 @@ impl MemoryManager {
             float_temp_index: 0,
             bool_temp_index: 0,
             constants_index: 0,
-            constants_dir: HashMap::new(),
+            int_constants_dir: HashMap::new(),
+            float_constants_dir: HashMap::new(),
         }
     }
 
@@ -74,7 +69,8 @@ impl MemoryManager {
         self.float_temp_index = 0;
         self.bool_temp_index = 0;
         self.constants_index = 0;
-        self.constants_dir.clear();
+        self.int_constants_dir.clear();
+        self.float_constants_dir.clear();
     }
 
     fn next_address(start: i64, index: &mut i64, limit: i64, label: &str) -> Result<i64, MemoryError> {
@@ -87,14 +83,6 @@ impl MemoryManager {
         let address = start + *index;
         *index += 1;
         Ok(address)
-    }
-
-    fn constant_key(value: QuadValue) -> ConstantKey {
-        match value {
-            QuadValue::Entero(val) => ConstantKey::Entero(val),
-            QuadValue::Flotante(val) => ConstantKey::Flotante(val.to_bits()),
-            QuadValue::Boleano(val) => ConstantKey::Boleano(val),
-        }
     }
 
     pub fn get_available_global_address(&mut self, var_type: VarType) -> Result<i64, MemoryError> {
@@ -161,16 +149,35 @@ impl MemoryManager {
     }
 
     pub fn get_constant_address(&mut self, value: QuadValue) -> i64 {
-        let key = Self::constant_key(value);
+        match value {
+            QuadValue::Entero(val) => {
+                if let Some(address) = self.int_constants_dir.get(&val) {
+                    return *address;
+                }
 
-        if let Some(address) = self.constants_dir.get(&key) {
-            return *address;
+                let address = CONSTANTS_START + self.constants_index;
+                self.constants_index += 1;
+                self.int_constants_dir.insert(val, address);
+                address
+            }
+            QuadValue::Flotante(val) => {
+                let key = val.to_bits();
+
+                if let Some(address) = self.float_constants_dir.get(&key) {
+                    return *address;
+                }
+
+                let address = CONSTANTS_START + self.constants_index;
+                self.constants_index += 1;
+                self.float_constants_dir.insert(key, address);
+                address
+            }
+            QuadValue::Boleano(_) => {
+                let address = CONSTANTS_START + self.constants_index;
+                self.constants_index += 1;
+                address
+            }
         }
-
-        let address = CONSTANTS_START + self.constants_index;
-        self.constants_index += 1;
-        self.constants_dir.insert(key, address);
-        address
     }
 }
 
@@ -194,9 +201,13 @@ mod tests {
         let first = mm.get_constant_address(QuadValue::Entero(2));
         let repeated = mm.get_constant_address(QuadValue::Entero(2));
         let other = mm.get_constant_address(QuadValue::Flotante(2.0));
+        let bool_first = mm.get_constant_address(QuadValue::Boleano(true));
+        let bool_second = mm.get_constant_address(QuadValue::Boleano(true));
 
         assert_eq!(first, 6000);
         assert_eq!(repeated, first);
         assert_eq!(other, 6001);
+        assert_eq!(bool_first, 6002);
+        assert_eq!(bool_second, 6003);
     }
 }
