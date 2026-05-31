@@ -51,14 +51,16 @@ impl DirFunc {
         let dir_func = self.dir_func.as_mut()
             .ok_or(SemanticError { message: "No dir_func created".to_string() })?;
 
-        let curr_func = self.curr_func.as_ref()
+        let curr_func = self.curr_func.clone()
             .ok_or(SemanticError { message: "No current function".to_string() })?;
         
-        let func_row = dir_func.get_mut(curr_func)
+        let func_row = dir_func.get_mut(&curr_func)
             .ok_or(SemanticError { message: "Function not found".to_string() })?;
 
         let var_table = func_row.1.as_mut()
             .ok_or(SemanticError { message: "Var table not created".to_string() })?;
+
+        let use_global_addresses = curr_func.starts_with("global-") || func_row.0 == FuncType::Program;
 
         for name in self.curr_vars.drain(..) {
             if var_table.contains_key(&name) {
@@ -66,8 +68,13 @@ impl DirFunc {
                 return Err(SemanticError { message: "Duplicate Variable".to_string() });
             }
             let address = MemoryManager::with_instance(|memory_manager| {
-                memory_manager.get_available_address(var_type)
-            });
+                if use_global_addresses {
+                    memory_manager.get_available_global_address(var_type)
+                } else {
+                    memory_manager.get_available_local_address(var_type)
+                }
+            })
+            .map_err(|error| SemanticError { message: error.message })?;
             var_table.insert(name, (address, var_type));
         }
         Ok(())
@@ -95,6 +102,7 @@ impl DirFunc {
         dir_func.clear();
         self.curr_func = None;
         self.curr_vars.clear();
+        MemoryManager::with_instance(|memory_manager| memory_manager.reset());
         Ok(())
     }
 }
@@ -252,8 +260,8 @@ mod tests {
                 .as_ref()
                 .unwrap();
 
-            assert_eq!(var_table.get("x"), Some(&(500, VarType::Flotante)));
-            assert_eq!(var_table.get("y"), Some(&(501, VarType::Flotante)));
+            assert_eq!(var_table.get("x"), Some(&(1500, VarType::Flotante)));
+            assert_eq!(var_table.get("y"), Some(&(1501, VarType::Flotante)));
             assert!(dir_func.curr_vars.is_empty());
         }
 
@@ -291,7 +299,7 @@ mod tests {
             dir_func.add_vars(VarType::Entero).unwrap();
 
             let var_name = "x".to_string();
-            assert_eq!(dir_func.get_var_info(&var_name), Ok((0, VarType::Entero)));
+            assert_eq!(dir_func.get_var_info(&var_name), Ok((1000, VarType::Entero)));
         }
     }
 

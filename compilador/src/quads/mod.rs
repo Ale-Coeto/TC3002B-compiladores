@@ -65,7 +65,7 @@ impl QuadGenerator {
         };
 
         let address = MemoryManager::with_instance(|memory_manager| {
-            memory_manager.save_constant(value)
+            memory_manager.get_constant_address(value)
         });
 
         self.variable_stack.push((address, var_type));
@@ -91,10 +91,6 @@ impl QuadGenerator {
         }
     }
 
-    // pub fn push_jump(&mut self) {
-
-    // }
-
     pub fn check_operator(&mut self, group: OperatorGroup) {
         if let Some(&top_operator) = self.operator_stack.last() {
             if group.matches(top_operator) {
@@ -106,8 +102,9 @@ impl QuadGenerator {
                     if let Ok(op) = crate::semantics::operators::Operator::try_from(operator) {
                         if let Some(result_type) = self.type_matching.get(left_type, right_type, op) {
                             let new_address = MemoryManager::with_instance(|memory_manager| {
-                                memory_manager.get_available_address(result_type)
-                            });
+                                memory_manager.get_available_temp_address(result_type)
+                            })
+                            .expect("unable to allocate temporary address");
                             self.quad_queue.push_back(Quad::new(
                                 self.counter,
                                 operator,

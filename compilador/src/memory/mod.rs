@@ -1,25 +1,40 @@
-use crate::semantics::var_types::VarType;
-use crate::quads::quad_value::QuadValue;
-use std::sync::{Mutex, OnceLock};
-use std::collections::HashMap;
+pub mod memory_error;
 
-pub const INT_MEMORY_SIZE: usize = 500;
-pub const FLOAT_MEMORY_SIZE: usize = 500;
-pub const BOOL_MEMORY_SIZE: usize = 500;
-pub const CONSTANTS_MEMORY_SIZE: usize = 500;
+use crate::quads::quad_value::QuadValue;
+use crate::semantics::var_types::VarType;
+use crate::memory::memory_error::MemoryError;
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
+
+pub const GLOBAL_INT_START: i64 = 1000;
+pub const GLOBAL_FLOAT_START: i64 = 1500;
+pub const LOCAL_INT_START: i64 = 2000;
+pub const LOCAL_FLOAT_START: i64 = 2500;
+pub const TEMP_INT_START: i64 = 3000;
+pub const TEMP_FLOAT_START: i64 = 4000;
+pub const TEMP_BOOL_START: i64 = 5000;
+pub const CONSTANTS_START: i64 = 6000;
+
+const GLOBAL_LOCAL_MEMORY_SIZE: i64 = 500;
+const TEMP_MEMORY_SIZE: i64 = 1000;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum ConstantKey {
+    Entero(i64),
+    Flotante(u64),
+    Boleano(bool),
+}
 
 pub struct MemoryManager {
-    int_memory: [i64; INT_MEMORY_SIZE],
-    float_memory: [f64; FLOAT_MEMORY_SIZE],
-    bool_memory: [bool; BOOL_MEMORY_SIZE],
-
-    constants_memory: [QuadValue; CONSTANTS_MEMORY_SIZE],
-    constants_dir: HashMap<i64, QuadValue>,
-
-    int_memory_index: i64,
-    float_memory_index: i64,
-    bool_memory_index: i64,
-    constants_memory_index: i64,
+    int_global_index: i64,
+    int_local_index: i64,
+    float_global_index: i64,
+    float_local_index: i64,
+    int_temp_index: i64,
+    float_temp_index: i64,
+    bool_temp_index: i64,
+    constants_index: i64,
+    constants_dir: HashMap<ConstantKey, i64>,
 }
 
 static MEMORY_MANAGER: OnceLock<Mutex<MemoryManager>> = OnceLock::new();
@@ -27,16 +42,15 @@ static MEMORY_MANAGER: OnceLock<Mutex<MemoryManager>> = OnceLock::new();
 impl MemoryManager {
     pub fn new() -> Self {
         Self {
-            int_memory: [0; INT_MEMORY_SIZE],
-            float_memory: [0.0; FLOAT_MEMORY_SIZE],
-            bool_memory: [false; BOOL_MEMORY_SIZE],
-            constants_memory: [QuadValue::Entero(0); CONSTANTS_MEMORY_SIZE],
+            int_global_index: 0,
+            int_local_index: 0,
+            float_global_index: 0,
+            float_local_index: 0,
+            int_temp_index: 0,
+            float_temp_index: 0,
+            bool_temp_index: 0,
+            constants_index: 0,
             constants_dir: HashMap::new(),
-
-            int_memory_index: 0,
-            float_memory_index: 0,
-            bool_memory_index: 0,
-            constants_memory_index: 0,
         }
     }
 
@@ -52,142 +66,137 @@ impl MemoryManager {
     }
 
     pub fn reset(&mut self) {
-        self.int_memory = [0; INT_MEMORY_SIZE];
-        self.float_memory = [0.0; FLOAT_MEMORY_SIZE];
-        self.bool_memory = [false; BOOL_MEMORY_SIZE];
-        self.int_memory_index = 0;
-        self.float_memory_index = 0;
-        self.bool_memory_index = 0;
-        self.constants_memory_index = 0;
+        self.int_global_index = 0;
+        self.int_local_index = 0;
+        self.float_global_index = 0;
+        self.float_local_index = 0;
+        self.int_temp_index = 0;
+        self.float_temp_index = 0;
+        self.bool_temp_index = 0;
+        self.constants_index = 0;
+        self.constants_dir.clear();
     }
 
-    pub fn save_in_memory(&mut self, value: QuadValue) -> i64 {
+    fn next_address(start: i64, index: &mut i64, limit: i64, label: &str) -> Result<i64, MemoryError> {
+        if *index >= limit {
+            return Err(MemoryError {
+                message: format!("Límite de memoria para variables {} alcanzado", label),
+            });
+        }
+
+        let address = start + *index;
+        *index += 1;
+        Ok(address)
+    }
+
+    fn constant_key(value: QuadValue) -> ConstantKey {
         match value {
-            QuadValue::Entero(val) => {
-                let address = self.int_memory_index;
-                self.int_memory[address as usize] = val;
-                self.int_memory_index += 1;
-                address
-            }
-            QuadValue::Flotante(val) => {
-                let address = self.float_memory_index;
-                self.float_memory[address as usize] = val;
-                self.float_memory_index += 1;
-                (INT_MEMORY_SIZE as i64) + address
-            }
-            QuadValue::Boleano(val) => {
-                let address = self.bool_memory_index;
-                self.bool_memory[address as usize] = val;
-                self.bool_memory_index += 1;
-                (INT_MEMORY_SIZE + FLOAT_MEMORY_SIZE) as i64 + address
-            }
+            QuadValue::Entero(val) => ConstantKey::Entero(val),
+            QuadValue::Flotante(val) => ConstantKey::Flotante(val.to_bits()),
+            QuadValue::Boleano(val) => ConstantKey::Boleano(val),
         }
     }
 
-    pub fn save_constant(&mut self, value: QuadValue) -> i64 {
-        let address = self.constants_memory_index;
-        self.constants_memory[address as usize] = value;
-        self.constants_memory_index += 1;
-        (INT_MEMORY_SIZE + FLOAT_MEMORY_SIZE + BOOL_MEMORY_SIZE) as i64 + address
-    }
-
-    pub fn get_available_address(&mut self, var_type: VarType) -> i64 {
+    pub fn get_available_global_address(&mut self, var_type: VarType) -> Result<i64, MemoryError> {
         match var_type {
-            VarType::Entero => {
-                let address = self.int_memory_index;
-                self.int_memory_index += 1;
-                address
-            }
-            VarType::Flotante => {
-                let address = self.float_memory_index;
-                self.float_memory_index += 1;
-                (INT_MEMORY_SIZE as i64) + address
-            }
-            VarType::Boleano => {
-                let address = self.bool_memory_index;
-                self.bool_memory_index += 1;
-                (INT_MEMORY_SIZE + FLOAT_MEMORY_SIZE) as i64 + address
-            }
+            VarType::Entero => Self::next_address(
+                GLOBAL_INT_START,
+                &mut self.int_global_index,
+                GLOBAL_LOCAL_MEMORY_SIZE,
+                "globales enteras",
+            ),
+            VarType::Flotante => Self::next_address(
+                GLOBAL_FLOAT_START,
+                &mut self.float_global_index,
+                GLOBAL_LOCAL_MEMORY_SIZE,
+                "globales flotantes",
+            ),
+            VarType::Boleano => Err(MemoryError {
+                message: "No se permiten boleanos globales".to_string(),
+            }),
         }
     }
 
-    pub fn get_from_memory(&self, address: i64) -> QuadValue {
-        let int_limit = INT_MEMORY_SIZE as i64;
-        let float_limit = int_limit + (FLOAT_MEMORY_SIZE as i64);
-        let bool_limit = float_limit + (BOOL_MEMORY_SIZE as i64);
-        let constant_limit = bool_limit + (CONSTANTS_MEMORY_SIZE as i64);
-
-        match address {
-            addr if addr >= 0 && addr < int_limit => {
-                let index = addr as usize;
-                QuadValue::Entero(self.int_memory[index])
-            }
-            addr if addr >= int_limit && addr < float_limit => {
-                let index = (addr - int_limit) as usize;
-                QuadValue::Flotante(self.float_memory[index])
-            }
-            addr if addr >= float_limit && addr < bool_limit => {
-                let index = (addr - float_limit) as usize;
-                QuadValue::Boleano(self.bool_memory[index])
-            }
-            addr if addr >= bool_limit && addr < constant_limit => {
-                let index = (addr - bool_limit) as usize;
-                self.constants_memory[index].clone()
-            }
-            _ => panic!("Error en tiempo de ejecución: Dirección de memoria {} fuera de rango", address),
+    pub fn get_available_local_address(&mut self, var_type: VarType) -> Result<i64, MemoryError> {
+        match var_type {
+            VarType::Entero => Self::next_address(
+                LOCAL_INT_START,
+                &mut self.int_local_index,
+                GLOBAL_LOCAL_MEMORY_SIZE,
+                "locales enteras",
+            ),
+            VarType::Flotante => Self::next_address(
+                LOCAL_FLOAT_START,
+                &mut self.float_local_index,
+                GLOBAL_LOCAL_MEMORY_SIZE,
+                "locales flotantes",
+            ),
+            VarType::Boleano => Err(MemoryError {
+                message: "No se permiten boleanos locales".to_string(),
+            }),
         }
+    }
+
+    pub fn get_available_temp_address(&mut self, var_type: VarType) -> Result<i64, MemoryError> {
+        match var_type {
+            VarType::Entero => Self::next_address(
+                TEMP_INT_START,
+                &mut self.int_temp_index,
+                TEMP_MEMORY_SIZE,
+                "temporales enteras",
+            ),
+            VarType::Flotante => Self::next_address(
+                TEMP_FLOAT_START,
+                &mut self.float_temp_index,
+                TEMP_MEMORY_SIZE,
+                "temporales floatantes",
+            ),
+            VarType::Boleano => Self::next_address(
+                TEMP_BOOL_START,
+                &mut self.bool_temp_index,
+                TEMP_MEMORY_SIZE,
+                "temporales booleanas",
+            ),
+        }
+    }
+
+    pub fn get_constant_address(&mut self, value: QuadValue) -> i64 {
+        let key = Self::constant_key(value);
+
+        if let Some(address) = self.constants_dir.get(&key) {
+            return *address;
+        }
+
+        let address = CONSTANTS_START + self.constants_index;
+        self.constants_index += 1;
+        self.constants_dir.insert(key, address);
+        address
     }
 }
-
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn save_multiple_types_and_addresses() {
+    fn allocates_scoped_addresses_and_deduplicates_constants() {
         let mut mm = MemoryManager::new();
 
-        // two ints
-        let a1 = mm.save_in_memory(QuadValue::Entero(10));
-        let a2 = mm.save_in_memory(QuadValue::Entero(20));
-        assert_eq!(a1, 0);
-        assert_eq!(a2, 1);
-        match mm.get_from_memory(a1) {
-            QuadValue::Entero(v) => assert_eq!(v, 10),
-            _ => panic!("expected Entero from memory"),
-        }
-        match mm.get_from_memory(a2) {
-            QuadValue::Entero(v) => assert_eq!(v, 20),
-            _ => panic!("expected Entero from memory"),
-        }
+        assert_eq!(mm.get_available_global_address(VarType::Entero).unwrap(), 1000);
+        assert_eq!(mm.get_available_global_address(VarType::Entero).unwrap(), 1001);
+        assert_eq!(mm.get_available_global_address(VarType::Flotante).unwrap(), 1500);
+        assert_eq!(mm.get_available_local_address(VarType::Entero).unwrap(), 2000);
+        assert_eq!(mm.get_available_local_address(VarType::Flotante).unwrap(), 2500);
+        assert_eq!(mm.get_available_temp_address(VarType::Entero).unwrap(), 3000);
+        assert_eq!(mm.get_available_temp_address(VarType::Flotante).unwrap(), 4000);
+        assert_eq!(mm.get_available_temp_address(VarType::Boleano).unwrap(), 5000);
 
-        // two floats
-        let f1 = mm.save_in_memory(QuadValue::Flotante(1.5));
-        let f2 = mm.save_in_memory(QuadValue::Flotante(2.5));
-        assert_eq!(f1, (INT_MEMORY_SIZE as i64) + 0);
-        assert_eq!(f2, (INT_MEMORY_SIZE as i64) + 1);
-        match mm.get_from_memory(f1) {
-            QuadValue::Flotante(v) => assert_eq!(v, 1.5),
-            _ => panic!("expected Flotante from memory"),
-        }
-        match mm.get_from_memory(f2) {
-            QuadValue::Flotante(v) => assert_eq!(v, 2.5),
-            _ => panic!("expected Flotante from memory"),
-        }
+        let first = mm.get_constant_address(QuadValue::Entero(2));
+        let repeated = mm.get_constant_address(QuadValue::Entero(2));
+        let other = mm.get_constant_address(QuadValue::Flotante(2.0));
 
-        // two bools
-        let b1 = mm.save_in_memory(QuadValue::Boleano(true));
-        let b2 = mm.save_in_memory(QuadValue::Boleano(false));
-        assert_eq!(b1, (INT_MEMORY_SIZE + FLOAT_MEMORY_SIZE) as i64 + 0);
-        assert_eq!(b2, (INT_MEMORY_SIZE + FLOAT_MEMORY_SIZE) as i64 + 1);
-        match mm.get_from_memory(b1) {
-            QuadValue::Boleano(v) => assert_eq!(v, true),
-            _ => panic!("expected Boleano from memory"),
-        }
-        match mm.get_from_memory(b2) {
-            QuadValue::Boleano(v) => assert_eq!(v, false),
-            _ => panic!("expected Boleano from memory"),
-        }
+        assert_eq!(first, 6000);
+        assert_eq!(repeated, first);
+        assert_eq!(other, 6001);
     }
 }
