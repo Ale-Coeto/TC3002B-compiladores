@@ -39,6 +39,8 @@ pub struct QuadGenerator {
     quad_queue: VecDeque<Quad>,
     counter: i64,
     type_matching: TypeMatching,
+    parameter_counter: i64,
+    temp_counter: i64,
 }
 
 impl QuadGenerator {
@@ -50,6 +52,8 @@ impl QuadGenerator {
             quad_queue: VecDeque::new(),
             counter: 0,
             type_matching: TypeMatching::new(),
+            parameter_counter: 0,
+            temp_counter: 0,
         }
     }
 
@@ -68,8 +72,12 @@ impl QuadGenerator {
             QuadOperator::GoTo => "goto",
             QuadOperator::GoToV => "gotov",
             QuadOperator::GoToF => "gotof",
-            QuadOperator::OpenParenthesis => "open_paren",
-            QuadOperator::CloseParenthesis => "close_paren",
+            QuadOperator::Era => "era",
+            QuadOperator::Param => "param",
+            QuadOperator::GoSub => "gosub",
+            QuadOperator::Return => "return",
+            QuadOperator::EndFunc => "endfunc",
+            QuadOperator::End => "end",
         }
     }
 
@@ -80,6 +88,16 @@ impl QuadGenerator {
         let result_address = quad.result.as_ref().map(|operand| operand.0).unwrap_or(-1);
 
         format!("{} {} {} {}", operator, left_address, right_address, result_address)
+    }
+
+    pub fn get_counter(&self) -> i64 {
+        self.counter
+    }
+
+    pub fn get_temp_count(&mut self) -> i64 {
+        let temp_count = self.temp_counter;
+        self.temp_counter = 0;
+        temp_count
     }
 
     pub fn push_start(&mut self) {
@@ -130,9 +148,9 @@ impl QuadGenerator {
                 let quad = Quad {
                     id: self.counter,
                     operator: QuadOperator::Asignacion,
-                    left_operand: Some((right_addr, right_type)),
+                    left_operand: Some((left_addr, left_type)),
                     right_operand: None,
-                    result: Some((left_addr, left_type)),
+                    result: Some((right_addr, right_type)),
                 };
                 self.quad_queue.push_back(quad);
                 self.counter += 1;
@@ -154,6 +172,7 @@ impl QuadGenerator {
                                 memory_manager.get_available_temp_address(result_type)
                             })
                             .expect("unable to allocate temporary address");
+                            self.temp_counter += 1;
                             self.quad_queue.push_back(Quad::new(
                                 self.counter,
                                 operator,
@@ -253,7 +272,72 @@ impl QuadGenerator {
         }
     }
 
-    pub fn push_
+    pub fn push_func_era(&mut self) {
+        self.parameter_counter = 0;
+        self.quad_queue.push_back(Quad::new(
+            self.counter,
+            QuadOperator::Era,
+            None,
+            None,
+            None,
+        ));
+        self.counter += 1;
+    }
+    pub fn get_parameter_counter(&self) -> i64 {
+        self.parameter_counter
+    }
+
+    pub fn parameter_counter_next(&mut self) {
+        self.parameter_counter += 1;
+    }
+
+    pub fn push_func_arg(&mut self) -> (VarType, i64) {
+        if let Some((top_var, top_type)) = self.variable_stack.pop() {
+            // verify param table
+            self.quad_queue.push_back(Quad::new(
+                self.counter,
+                QuadOperator::Param,
+                Some((top_var, top_type)),
+                None,
+                Some((self.parameter_counter, VarType::Entero)),
+            ));
+            self.counter += 1;
+            return (top_type, self.parameter_counter);
+        }
+        (VarType::Entero, -1)
+    }
+
+    pub fn push_func_gosub(&mut self, func_address: i64) {
+        self.quad_queue.push_back(Quad::new(
+            self.counter,
+            QuadOperator::GoSub,
+            None,
+            None,
+            Some((func_address,VarType::Entero))
+        ))
+    }
+
+    pub fn push_func_end(&mut self) {
+        self.quad_queue.push_back(Quad::new(
+            self.counter,
+            QuadOperator::EndFunc,
+            None,
+            None,
+            None,
+        ));
+        self.counter += 1;
+    }
+
+     pub fn push_end(&mut self) {
+        self.quad_queue.push_back(Quad::new(
+            self.counter,
+            QuadOperator::End,
+            None,
+            None,
+            None,
+        ));
+        self.counter += 1;
+    }
 
     pub fn get_results(&self) -> Vec<String> {
         self.quad_queue.iter().map(Self::quad_to_string).collect()

@@ -73,6 +73,14 @@ impl MemoryManager {
         self.float_constants_dir.clear();
     }
 
+    pub fn reset_function_scope(&mut self) {
+        self.int_local_index = 0;
+        self.float_local_index = 0;
+        self.int_temp_index = 0;
+        self.float_temp_index = 0;
+        self.bool_temp_index = 0;
+    }
+
     fn next_address(start: i64, index: &mut i64, limit: i64, label: &str) -> Result<i64, MemoryError> {
         if *index >= limit {
             return Err(MemoryError {

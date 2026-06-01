@@ -15,8 +15,12 @@ pub enum QuadOperator {
     GoTo = 10,
     GoToV = 11,
     GoToF = 12,
-    OpenParenthesis = 13,
-    CloseParenthesis = 14,
+    Era = 13,
+    Param = 14,
+    GoSub = 15,
+    Return = 16,
+    EndFunc = 17,
+    End = 18,
 }
 
 pub const OP_COUNT: usize = 8;

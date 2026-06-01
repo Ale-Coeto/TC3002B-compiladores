@@ -2,13 +2,31 @@ use crate::memory::MemoryManager;
 use crate::semantics::func_types::FuncType;
 use crate::semantics::var_types::VarType;
 use crate::semantics::semantic_error::SemanticError;
+ 
 
 use std::collections::HashMap;
 
+pub struct VarDetails {
+    address: i64,
+    var_type: VarType,
+}
+
+pub struct FuncDetails {
+    address: i64,
+    func_type: FuncType,
+    start_index: i64,
+    parameters: Option<Vec<VarType>>,
+    memory: (i64, i64, i64),
+    var_table: Option<HashMap<String, VarDetails>>
+}
+
 pub struct DirFunc {
-    dir_func: Option<HashMap<String, (FuncType, Option<HashMap<String, (i64, VarType)>>)>>,
+    dir_func: Option<HashMap<String, FuncDetails>>,
     curr_func: Option<String>,
+    call_func: Option<String>,
     curr_vars: Vec<String>,
+    param_count: i64,
+    local_count: i64,
 }
 
 impl DirFunc {
@@ -16,7 +34,10 @@ impl DirFunc {
         Self {
             dir_func: None,
             curr_func: None,
+            call_func: None,
             curr_vars: Vec::new(),
+            param_count: 0,
+            local_count: 0,
         }
     }
 
@@ -27,8 +48,93 @@ impl DirFunc {
     pub fn add_func(&mut self, name: String, func_type: FuncType) -> Result<(), SemanticError> {
         let dir_func = self.dir_func.as_mut()
             .ok_or(SemanticError { message: "No dir_func created".to_string() })?;
-        dir_func.insert(name.clone(), (func_type, None));
+        if dir_func.contains_key(&name) {
+            return Err(SemanticError { message: "Nombre de función duplicado".to_string() });
+        }
+        let address = MemoryManager::with_instance(|memory_manager| {
+            let mut var_type = VarType::Entero;
+            if func_type == FuncType::Flotante {
+                var_type = VarType::Flotante;
+            }
+
+            if func_type != FuncType::Program && !name.starts_with("global") {
+                memory_manager.get_available_global_address(var_type)
+            } else {
+                Ok(0)
+            }
+        })
+        .map_err(|error| SemanticError { message: error.message })?;
+
+        dir_func.insert(name.clone(), FuncDetails { address, func_type: func_type, start_index: 0, parameters: None, memory: (0,0,0), var_table: None });
         self.curr_func = Some(name);
+        Ok(())
+    }
+
+    pub fn add_param(&mut self, var_type: VarType) -> Result<(), SemanticError> {
+        let dir_func = self.dir_func.as_mut()
+            .ok_or(SemanticError { message: "No dir_func created".to_string() })?;
+
+        let curr_func = self.curr_func.as_ref()
+            .ok_or(SemanticError { message: "No current function".to_string() })?;
+
+
+        let func_row = dir_func.get_mut(curr_func)
+            .ok_or(SemanticError { message: "Function not found".to_string() })?;
+
+        if func_row.parameters.is_none() {
+            func_row.parameters = Some(Vec::new());
+        }
+
+        func_row.parameters.as_mut().unwrap().push(var_type);
+        self.param_count += 1;
+
+        Ok(())
+    }
+
+    pub fn save_param_count(&mut self) -> Result<(), SemanticError> {
+        let dir_func = self.dir_func.as_mut()
+            .ok_or(SemanticError { message: "No dir_func created".to_string() })?;
+
+        let curr_func = self.curr_func.as_ref()
+            .ok_or(SemanticError { message: "No current function".to_string() })?;
+
+        let func_row = dir_func.get_mut(curr_func)
+            .ok_or(SemanticError { message: "Function not found".to_string() })?;
+
+        func_row.memory.0 = self.param_count;
+        self.param_count = 0;
+
+        Ok(())
+    }
+
+    pub fn save_local_count(&mut self) -> Result<(), SemanticError> {
+        let dir_func = self.dir_func.as_mut()
+            .ok_or(SemanticError { message: "No dir_func created".to_string() })?;
+
+        let curr_func = self.curr_func.as_ref()
+            .ok_or(SemanticError { message: "No current function".to_string() })?;
+
+        let func_row = dir_func.get_mut(curr_func)
+            .ok_or(SemanticError { message: "Function not found".to_string() })?;
+
+        func_row.memory.1 = self.local_count;
+        self.local_count = 0;
+
+        Ok(())
+    }
+
+    pub fn add_temp_count(&mut self, temp_count: i64) -> Result<(), SemanticError> {
+        let dir_func = self.dir_func.as_mut()
+            .ok_or(SemanticError { message: "No dir_func created".to_string() })?;
+
+        let curr_func = self.curr_func.as_ref()
+            .ok_or(SemanticError { message: "No current function".to_string() })?;
+
+        let func_row = dir_func.get_mut(curr_func)
+            .ok_or(SemanticError { message: "Function not found".to_string() })?;
+
+        func_row.memory.2 = temp_count;
+
         Ok(())
     }
 
@@ -39,12 +145,107 @@ impl DirFunc {
         let curr_func = self.curr_func.as_ref()
             .ok_or(SemanticError { message: "No current function".to_string() })?;
         
-        dir_func.entry(curr_func.clone()).and_modify(|f| f.1 = Some(HashMap::new()));
+        dir_func.entry(curr_func.clone()).and_modify(|f| f.var_table = Some(HashMap::new()));
         Ok(())
     }
 
     pub fn add_var_name(&mut self, name: String) {
         self.curr_vars.push(name);
+        self.local_count += 1;
+    }
+
+    pub fn add_func_start_index(&mut self, index: i64) {
+        if let Some(dir_func) = self.dir_func.as_mut() {
+            if let Some(curr_func) = self.curr_func.as_ref() {
+                if let Some(func_row) = dir_func.get_mut(curr_func) {
+                    func_row.start_index = index;
+                }
+            }
+        }
+    }
+
+    pub fn check_func_id(&mut self, name: &String) -> Result<(), SemanticError> {
+        let dir_func = self.dir_func.as_ref()
+            .ok_or(SemanticError { message: "No dir_func created".to_string() })?;
+
+        if dir_func.contains_key(name) {
+            self.call_func = Some(name.clone());
+            Ok(())
+        } else {
+            Err(SemanticError { message: format!("Función '{}' no encontrada", name) })
+        }
+    }
+
+    pub fn check_func_arg(&mut self, var_type: VarType, param_num: i64) -> Result<(), SemanticError> {
+        let dir_func = self.dir_func.as_ref()
+            .ok_or(SemanticError { message: "No dir_func created".to_string() })?;
+
+        let call_func = self.call_func.as_ref()
+            .ok_or(SemanticError { message: "No function call in progress".to_string() })?;
+
+        let func_row = dir_func.get(call_func)
+            .ok_or(SemanticError { message: format!("Función '{}' no encontrada", call_func) })?;
+
+        let parameters = func_row.parameters.as_ref()
+            .ok_or(SemanticError { message: format!("La función '{}' no tiene argumentos", call_func) })?;
+
+        let index = param_num as usize;
+        let expected_type = parameters.get(index)
+            .ok_or(SemanticError { message: format!("No existe argumento en la posición {}", param_num) })?;
+
+        if expected_type != &var_type {
+            return Err(SemanticError { message: format!("Tipo de argumento inválido en la posición {}", param_num) });
+        }
+
+        Ok(())
+    }
+
+    pub fn check_func_param_count(&self, args_count: i64) -> Result<(), SemanticError> {
+        let dir_func = self.dir_func.as_ref()
+            .ok_or(SemanticError { message: "No dir_func created".to_string() })?;
+
+        let call_func = self.call_func.as_ref()
+            .ok_or(SemanticError { message: "No function call in progress".to_string() })?;
+
+        let func_row = dir_func.get(call_func)
+            .ok_or(SemanticError { message: format!("Función '{}' no encontrada", call_func) })?;
+
+        let parameters = func_row.parameters.as_ref()
+            .ok_or(SemanticError { message: format!("La función '{}' no tiene argumentos", call_func) })?; 
+
+        if parameters.len() as i64 - 1 != args_count {
+            return Err(SemanticError { message: format!("El número de argumentos de la función {} no coincide", call_func) })
+        }
+        Ok(())
+    }
+
+    pub fn get_address(&self) -> Result<i64, SemanticError> {
+        let dir_func = self.dir_func.as_ref()
+            .ok_or(SemanticError { message: "No dir_func created".to_string() })?;
+
+        let call_func = self.call_func.as_ref()
+            .ok_or(SemanticError { message: "No function call in progress".to_string() })?;
+
+        let func_row = dir_func.get(call_func)
+            .ok_or(SemanticError { message: format!("Función '{}' no encontrada", call_func) })?;
+
+        Ok(func_row.address)
+    }
+
+    pub fn release_var_table(&mut self) -> Result<(), SemanticError> {
+        let dir_func = self.dir_func.as_mut()
+            .ok_or(SemanticError { message: "No dir_func created".to_string() })?;
+
+        let curr_func = self.curr_func.as_ref()
+            .ok_or(SemanticError { message: "No current function".to_string() })?;
+
+        let func_row = dir_func.get_mut(curr_func)
+            .ok_or(SemanticError { message: "Function not found".to_string() })?;
+
+        func_row.var_table = None;
+        self.curr_vars.clear();
+
+        Ok(())
     }
 
     pub fn add_vars(&mut self, var_type: VarType) -> Result<(), SemanticError> {
@@ -57,10 +258,10 @@ impl DirFunc {
         let func_row = dir_func.get_mut(&curr_func)
             .ok_or(SemanticError { message: "Function not found".to_string() })?;
 
-        let var_table = func_row.1.as_mut()
+        let var_table = func_row.var_table.as_mut()
             .ok_or(SemanticError { message: "Var table not created".to_string() })?;
 
-        let use_global_addresses = curr_func.starts_with("global-") || func_row.0 == FuncType::Program;
+        let use_global_addresses = curr_func.starts_with("global-") || func_row.func_type == FuncType::Program;
 
         for name in self.curr_vars.drain(..) {
             if var_table.contains_key(&name) {
@@ -75,7 +276,7 @@ impl DirFunc {
                 }
             })
             .map_err(|error| SemanticError { message: error.message })?;
-            var_table.insert(name, (address, var_type));
+            var_table.insert(name, VarDetails { address, var_type });
         }
         Ok(())
     }
@@ -86,13 +287,22 @@ impl DirFunc {
         let curr_func = self.curr_func.as_ref()
             .ok_or(SemanticError { message: "No current function".to_string() })?;
 
-        let func_row = dir_func.get(curr_func)
-            .ok_or(SemanticError { message: "Function not found".to_string() })?;
-        let var_table = func_row.1.as_ref()
-            .ok_or(SemanticError { message: "Var table not created".to_string() })?;
+        let entry = dir_func
+            .get(curr_func)
+            .and_then(|func_row| func_row.var_table.as_ref())
+            .and_then(|var_table| var_table.get(name))
+            .or_else(|| {
+                dir_func
+                    .iter()
+                    .find(|(func_name, func_row)| {
+                        func_name.starts_with("global-") && func_row.var_table.is_some()
+                    })
+                    .and_then(|(_, func_row)| func_row.var_table.as_ref())
+                    .and_then(|var_table| var_table.get(name))
+            })
+            .ok_or(SemanticError { message: format!("Variable '{}' not found", name) })?;
 
-        var_table.get(name).copied()
-            .ok_or(SemanticError { message: format!("Variable '{}' not found", name) })
+        Ok((entry.address, entry.var_type))
     }
 
     pub fn delete_all(&mut self) -> Result<(), SemanticError> {
@@ -163,6 +373,7 @@ mod tests {
         #[test]
         fn test_02_01_success_sets_current_function() {
             let _guard = test_guard();
+            reset_memory_manager();
             let mut dir_func = DirFunc::new();
             dir_func.create_dir_func();
 
@@ -171,7 +382,8 @@ mod tests {
                 .unwrap();
 
             assert_eq!(dir_func.curr_func.as_deref(), Some("mi_funcion"));
-            assert!(dir_func.dir_func.as_ref().unwrap().contains_key("mi_funcion"));
+            let func_row = dir_func.dir_func.as_ref().unwrap().get("mi_funcion").unwrap();
+            assert_eq!(func_row.address, 1000);
         }
 
         #[test]
@@ -184,6 +396,95 @@ mod tests {
                 .unwrap_err();
 
             assert_eq!(error, SemanticError { message: "No dir_func created".to_string() });
+        }
+
+        #[test]
+        fn test_02_03_add_func_start_index_updates_current_function() {
+            let _guard = test_guard();
+            let mut dir_func = DirFunc::new();
+            dir_func.create_dir_func();
+            dir_func
+                .add_func("mi_funcion".to_string(), FuncType::Entero)
+                .unwrap();
+
+            dir_func.add_func_start_index(42);
+
+            let func_row = dir_func.dir_func.as_ref().unwrap().get("mi_funcion").unwrap();
+            assert_eq!(func_row.start_index, 42);
+        }
+
+        #[test]
+        fn test_02_04_release_var_table_clears_table() {
+            let _guard = test_guard();
+            let mut dir_func = setup_dir_func_with_program();
+            dir_func.create_var_table().unwrap();
+
+            dir_func.release_var_table().unwrap();
+
+            let func_row = dir_func.dir_func.as_ref().unwrap().get("programa_principal").unwrap();
+            assert!(func_row.var_table.is_none());
+            assert!(dir_func.curr_vars.is_empty());
+        }
+
+        #[test]
+        fn test_02_05_check_func_id_validates_existing_function() {
+            let _guard = test_guard();
+            let mut dir_func = DirFunc::new();
+            dir_func.create_dir_func();
+            dir_func.add_func("mi_funcion".to_string(), FuncType::Entero).unwrap();
+
+            assert!(dir_func.check_func_id(&"mi_funcion".to_string()).is_ok());
+        }
+
+        #[test]
+        fn test_02_06_check_func_id_errors_for_missing_function() {
+            let _guard = test_guard();
+            let mut dir_func = DirFunc::new();
+            dir_func.create_dir_func();
+
+            let error = dir_func.check_func_id(&"mi_funcion".to_string()).unwrap_err();
+
+            assert_eq!(error, SemanticError { message: "Función 'mi_funcion' no encontrada".to_string() });
+        }
+
+        #[test]
+        fn test_02_07_check_func_arg_validates_existing_argument() {
+            let _guard = test_guard();
+            let mut dir_func = DirFunc::new();
+            dir_func.create_dir_func();
+            dir_func.add_func("mi_funcion".to_string(), FuncType::Entero).unwrap();
+            dir_func.add_param(VarType::Entero).unwrap();
+            dir_func.check_func_id(&"mi_funcion".to_string()).unwrap();
+
+            assert!(dir_func.check_func_arg(VarType::Entero, 0).is_ok());
+        }
+
+        #[test]
+        fn test_02_08_check_func_arg_errors_on_type_mismatch() {
+            let _guard = test_guard();
+            let mut dir_func = DirFunc::new();
+            dir_func.create_dir_func();
+            dir_func.add_func("mi_funcion".to_string(), FuncType::Entero).unwrap();
+            dir_func.add_param(VarType::Entero).unwrap();
+            dir_func.check_func_id(&"mi_funcion".to_string()).unwrap();
+
+            let error = dir_func.check_func_arg(VarType::Flotante, 0).unwrap_err();
+
+            assert_eq!(error, SemanticError { message: "Tipo de argumento inválido en la posición 0".to_string() });
+        }
+
+        #[test]
+        fn test_02_09_check_func_arg_errors_when_index_does_not_exist() {
+            let _guard = test_guard();
+            let mut dir_func = DirFunc::new();
+            dir_func.create_dir_func();
+            dir_func.add_func("mi_funcion".to_string(), FuncType::Entero).unwrap();
+            dir_func.add_param(VarType::Entero).unwrap();
+            dir_func.check_func_id(&"mi_funcion".to_string()).unwrap();
+
+            let error = dir_func.check_func_arg(VarType::Entero, 1).unwrap_err();
+
+            assert_eq!(error, SemanticError { message: "No existe argumento en la posición 1".to_string() });
         }
     }
 
@@ -198,7 +499,7 @@ mod tests {
             dir_func.create_var_table().unwrap();
 
             let func_row = dir_func.dir_func.as_ref().unwrap().get("programa_principal").unwrap();
-            assert!(func_row.1.is_some());
+            assert!(func_row.var_table.is_some());
         }
 
         #[test]
@@ -256,13 +557,34 @@ mod tests {
                 .unwrap()
                 .get("programa_principal")
                 .unwrap()
-                .1
+                .var_table
                 .as_ref()
                 .unwrap();
 
-            assert_eq!(var_table.get("x"), Some(&(1500, VarType::Flotante)));
-            assert_eq!(var_table.get("y"), Some(&(1501, VarType::Flotante)));
+            let vx = var_table.get("x").unwrap();
+            let vy = var_table.get("y").unwrap();
+
+            assert_eq!(vx.address, 1500);
+            assert_eq!(vx.var_type, VarType::Flotante);
+
+            assert_eq!(vy.address, 1501);
+            assert_eq!(vy.var_type, VarType::Flotante);
             assert!(dir_func.curr_vars.is_empty());
+        }
+
+        #[test]
+        fn test_05_01b_save_local_count_updates_memory_tuple() {
+            let _guard = test_guard();
+            let mut dir_func = setup_dir_func_with_program();
+            dir_func.create_var_table().unwrap();
+            dir_func.add_var_name("x".to_string());
+            dir_func.add_var_name("y".to_string());
+
+            dir_func.add_vars(VarType::Flotante).unwrap();
+            dir_func.save_local_count().unwrap();
+
+            let func_row = dir_func.dir_func.as_ref().unwrap().get("programa_principal").unwrap();
+            assert_eq!(func_row.memory.1, 2);
         }
 
         #[test]
@@ -291,15 +613,14 @@ mod tests {
         }
 
         #[test]
-        fn test_05_04_get_var_info_returns_address_and_type() {
+        fn test_05_05_add_temp_count_updates_memory_tuple() {
             let _guard = test_guard();
             let mut dir_func = setup_dir_func_with_program();
-            dir_func.create_var_table().unwrap();
-            dir_func.add_var_name("x".to_string());
-            dir_func.add_vars(VarType::Entero).unwrap();
 
-            let var_name = "x".to_string();
-            assert_eq!(dir_func.get_var_info(&var_name), Ok((1000, VarType::Entero)));
+            dir_func.add_temp_count(7).unwrap();
+
+            let func_row = dir_func.dir_func.as_ref().unwrap().get("programa_principal").unwrap();
+            assert_eq!(func_row.memory.2, 7);
         }
     }
 

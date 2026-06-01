@@ -75,4 +75,12 @@ mod tests {
             include_str!("tests/output/mientras.txt"),
         );
     }
+
+    #[test]
+    fn functions_generate_expected_quads() {
+        assert_output_matches(
+            include_str!("tests/input/functions.txt"),
+            include_str!("tests/output/functions.txt"),
+        );
+    }
 }

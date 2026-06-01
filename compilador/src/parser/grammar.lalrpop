@@ -76,7 +76,7 @@ pub ProgramaIdSemantics: () = {
     }
 }
 
-// Punto neurálgico 7
+// Punto neurálgico 
 pub Inicio: () = {
     "inicio" => {
         quad_generator.push_main();
@@ -104,8 +104,13 @@ VarsNewTable: () = {
     }
 };
 
+// Punto neurálgico Func 4
 ListaVars: () = {
-    ListaId ":" Tipo ";" AgregarVars => (),
+    ListaId ":" Tipo ";" AgregarVars => {
+        let _ = semantics.dir_func.save_local_count();
+        let quad_counter = quad_generator.get_counter();
+        let _ = semantics.dir_func.add_func_start_index(quad_counter);
+    },
 };
 
 ListaId: () = {
@@ -145,8 +150,22 @@ AddFuncSemantics: () = {
     }
 }
 
+// Punto neurálgico Func 5
 DefFunc: () = {
-    "(" ListaArgs ")" "{" OpcionVars Cuerpo "}" ";" => (),
+    "(" ListaArgs ParamCount "{" OpcionVars Cuerpo "}" ";" => {
+        let _ = semantics.dir_func.release_var_table();
+        quad_generator.push_func_end();
+        let temp_count = quad_generator.get_temp_count();
+        let _ = semantics.dir_func.add_temp_count(temp_count);
+        MemoryManager::with_instance(|memory_manager| memory_manager.reset_function_scope());
+    },
+};
+
+// Punto neurálgico Func 3
+pub ParamCount: () = {
+    ")" => {
+        let _ = semantics.dir_func.save_param_count();
+    }
 };
 
 ListaArgs: () = {
@@ -158,10 +177,17 @@ Args: () = {
     ArgsVarSemantics AgregarArgs => (),
 };
 
-// Punto neurálgico 5
+// Punto neurálgico Func 2
 ArgsVarSemantics: () = {
-    <_id:Identificador> ":" Tipo => {
+    <_id:Identificador> ":" "entero" => {
         let _ = semantics.dir_func.add_var_name(_id.clone());
+        let _ = semantics.dir_func.add_vars(VarType::Entero);
+        let _ = semantics.dir_func.add_param(VarType::Entero);
+    },
+    <_id:Identificador> ":" "flotante" => {
+        let _ = semantics.dir_func.add_var_name(_id.clone());
+        let _ = semantics.dir_func.add_vars(VarType::Flotante);
+        let _ = semantics.dir_func.add_param(VarType::Flotante);
     }
 };
 
@@ -184,6 +210,7 @@ ListaEstatuto: () = {
     => (),
 };
 
+// Punto neurálgico 5
 Tipo: () = {
     "entero" => {
         let _ = semantics.dir_func.add_vars(VarType::Entero);
@@ -194,7 +221,7 @@ Tipo: () = {
 };
 
 Estatuto: () = {
-    PushId AsignaOLlamada => (),
+    AsignaOLlamada => (),
     Condicion => (),
     Ciclo => (),
     Imprime => (),
@@ -208,10 +235,21 @@ ListaEstatutoAdentro: () = {
 
 AsignaOLlamada: () = {
     // Punto neurálgico Quads 8
-    "=" Expresion ";" => {
+    <_id:Identificador> "=" Expresion ";" => {
+        if let Ok((address, var_type)) = semantics.dir_func.get_var_info(&_id.clone()) {
+            quad_generator.push_id(address, var_type);
+        }
         quad_generator.equals_quad();
     },
-    LlamadaSinId => (),
+    CheckFuncId LlamadaSinId => (),
+};
+
+// Punto neurálgico Func Call 1
+pub CheckFuncId: () = {
+    <_id:Identificador> => {
+        let _ = semantics.dir_func.check_func_id(&_id.clone());
+        quad_generator.push_func_era();
+    }
 };
 
 Condicion: () = {
@@ -270,7 +308,13 @@ pub WhileEnd: () = {
 };
 
 LlamadaSinId: () = {
-    "(" ListaExpresion ")" ";" => (),
+    "(" ListaExpresion ")" ";" => {
+        let parameter_counter = quad_generator.get_parameter_counter();
+        let _ = semantics.dir_func.check_func_param_count(parameter_counter);
+        if let Ok(memory_address) = semantics.dir_func.get_address() {
+            quad_generator.push_func_gosub(memory_address);
+        }
+    },
 };
 
 Llamada: () = {
@@ -278,13 +322,28 @@ Llamada: () = {
 };
 
 ListaExpresion: () = {
-    Expresion AgregarExpresion => (),
+    ArgCheck AgregarExpresion => (),
     => (),
 };
 
+// Punto neurálgico Func Call 2
+pub ArgCheck: () = {
+    Expresion => {
+        let (var_type, param_num) = quad_generator.push_func_arg();
+        let _ = semantics.dir_func.check_func_arg(var_type, param_num);
+    }
+};
+
 AgregarExpresion: () = {
-    "," Expresion AgregarExpresion => (),
+    MoveParamCounter Expresion AgregarExpresion => (),
     => (),
+};
+
+// Punto neurálgico Func Call 3
+pub MoveParamCounter: () = {
+    "," => {
+        quad_generator.parameter_counter_next();
+    }
 };
 
 Imprime: () = {
