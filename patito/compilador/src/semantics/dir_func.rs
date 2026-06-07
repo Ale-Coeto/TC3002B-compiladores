@@ -29,6 +29,13 @@ pub struct DirFunc {
     local_count: i64,
 }
 
+pub struct FuncJson {
+    pub name: String,
+    pub start_index: i64,
+    pub local_count: i64,
+    pub temp_count: i64,
+}
+
 impl DirFunc {
     pub fn new() -> Self {
         Self {
@@ -45,7 +52,7 @@ impl DirFunc {
         self.dir_func = Some(HashMap::new());
     }
 
-    pub fn add_func(&mut self, name: String, func_type: FuncType) -> Result<(), SemanticError> {
+    pub fn add_func(&mut self, name: String, func_type: FuncType, start_index: i64) -> Result<(), SemanticError> {
         let dir_func = self.dir_func.as_mut()
             .ok_or(SemanticError { message: "No dir_func created".to_string() })?;
         if dir_func.contains_key(&name) {
@@ -65,7 +72,7 @@ impl DirFunc {
         })
         .map_err(|error| SemanticError { message: error.message })?;
 
-        dir_func.insert(name.clone(), FuncDetails { address, func_type: func_type, start_index: 0, parameters: None, memory: (0,0,0), var_table: None });
+        dir_func.insert(name.clone(), FuncDetails { address, func_type: func_type, start_index, parameters: None, memory: (0,0,0), var_table: None });
         self.curr_func = Some(name);
         Ok(())
     }
@@ -239,6 +246,21 @@ impl DirFunc {
         Ok(call_func.clone())
     }
 
+    pub fn get_dir_func(&self) -> Vec<FuncJson> {
+        let Some(dir_func) = self.dir_func.as_ref() else { return Vec::new() };
+
+        dir_func
+            .iter()
+            .filter(|(name, _)| !name.starts_with("global-"))
+            .map(|(name, details)| FuncJson {
+                name: name.clone(),
+                start_index: details.start_index,
+                local_count: details.memory.1,
+                temp_count: details.memory.2,
+            })
+            .collect()
+    }
+
     pub fn release_var_table(&mut self) -> Result<(), SemanticError> {
         let dir_func = self.dir_func.as_mut()
             .ok_or(SemanticError { message: "No dir_func created".to_string() })?;
@@ -346,7 +368,7 @@ mod tests {
         reset_memory_manager();
         let mut dir_func = DirFunc::new();
         dir_func.create_dir_func();
-        dir_func.add_func("programa_principal".to_string(), FuncType::Program).unwrap();
+        dir_func.add_func("programa_principal".to_string(), FuncType::Program, 0).unwrap();
         dir_func
     }
 
@@ -385,7 +407,7 @@ mod tests {
             dir_func.create_dir_func();
 
             dir_func
-                .add_func("mi_funcion".to_string(), FuncType::Entero)
+                .add_func("mi_funcion".to_string(), FuncType::Entero, 0)
                 .unwrap();
 
             assert_eq!(dir_func.curr_func.as_deref(), Some("mi_funcion"));
@@ -399,7 +421,7 @@ mod tests {
             let mut dir_func = DirFunc::new();
 
             let error = dir_func
-                .add_func("mi_funcion".to_string(), FuncType::Entero)
+                .add_func("mi_funcion".to_string(), FuncType::Entero, 0)
                 .unwrap_err();
 
             assert_eq!(error, SemanticError { message: "No dir_func created".to_string() });
@@ -411,7 +433,7 @@ mod tests {
             let mut dir_func = DirFunc::new();
             dir_func.create_dir_func();
             dir_func
-                .add_func("mi_funcion".to_string(), FuncType::Entero)
+                .add_func("mi_funcion".to_string(), FuncType::Entero, 0)
                 .unwrap();
 
             dir_func.add_func_start_index(42);
@@ -438,7 +460,7 @@ mod tests {
             let _guard = test_guard();
             let mut dir_func = DirFunc::new();
             dir_func.create_dir_func();
-            dir_func.add_func("mi_funcion".to_string(), FuncType::Entero).unwrap();
+            dir_func.add_func("mi_funcion".to_string(), FuncType::Entero, 0).unwrap();
 
             assert!(dir_func.check_func_id(&"mi_funcion".to_string()).is_ok());
         }
@@ -459,7 +481,7 @@ mod tests {
             let _guard = test_guard();
             let mut dir_func = DirFunc::new();
             dir_func.create_dir_func();
-            dir_func.add_func("mi_funcion".to_string(), FuncType::Entero).unwrap();
+            dir_func.add_func("mi_funcion".to_string(), FuncType::Entero, 0).unwrap();
             dir_func.add_param(VarType::Entero).unwrap();
             dir_func.check_func_id(&"mi_funcion".to_string()).unwrap();
 
@@ -471,7 +493,7 @@ mod tests {
             let _guard = test_guard();
             let mut dir_func = DirFunc::new();
             dir_func.create_dir_func();
-            dir_func.add_func("mi_funcion".to_string(), FuncType::Entero).unwrap();
+            dir_func.add_func("mi_funcion".to_string(), FuncType::Entero, 0).unwrap();
             dir_func.add_param(VarType::Entero).unwrap();
             dir_func.check_func_id(&"mi_funcion".to_string()).unwrap();
 
@@ -485,7 +507,7 @@ mod tests {
             let _guard = test_guard();
             let mut dir_func = DirFunc::new();
             dir_func.create_dir_func();
-            dir_func.add_func("mi_funcion".to_string(), FuncType::Entero).unwrap();
+            dir_func.add_func("mi_funcion".to_string(), FuncType::Entero, 0).unwrap();
             dir_func.add_param(VarType::Entero).unwrap();
             dir_func.check_func_id(&"mi_funcion".to_string()).unwrap();
 

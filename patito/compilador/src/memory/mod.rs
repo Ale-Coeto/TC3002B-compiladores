@@ -31,6 +31,16 @@ pub struct MemoryManager {
     float_constants_dir: HashMap<u64, i64>,
 }
 
+pub enum ConstantValue {
+    Entero(i64),
+    Flotante(f64),
+}
+
+pub struct ConstantJson {
+    pub address: i64,
+    pub value: ConstantValue,
+}
+
 static MEMORY_MANAGER: OnceLock<Mutex<MemoryManager>> = OnceLock::new();
 
 impl MemoryManager {
@@ -186,6 +196,27 @@ impl MemoryManager {
                 address
             }
         }
+    }
+
+    pub fn get_constants(&self) -> Vec<ConstantJson> {
+        let mut constants: Vec<ConstantJson> = self.int_constants_dir
+            .iter()
+            .map(|(&val, &address)| ConstantJson {
+                address,
+                value: ConstantValue::Entero(val),
+            })
+            .chain(
+                self.float_constants_dir
+                    .iter()
+                    .map(|(&bits, &address)| ConstantJson {
+                        address,
+                        value: ConstantValue::Flotante(f64::from_bits(bits)),
+                    })
+            )
+            .collect();
+
+        constants.sort_by_key(|c| c.address);
+        constants
     }
 }
 

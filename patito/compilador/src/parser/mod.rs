@@ -2,9 +2,17 @@ use crate::scanner::Scanner;
 use crate::grammar::ProgramaParser;
 use crate::scanner::Token;
 use crate::semantics::Semantics;
+use crate::semantics::dir_func::FuncJson;
+use crate::memory::{MemoryManager, ConstantJson};
 use crate::quads::QuadGenerator;
 
 use lalrpop_util::ParseError;
+
+pub struct ParseOutput {
+    pub quads: Vec<String>,
+    pub dir_func: Vec<FuncJson>,
+    pub constants: Vec<ConstantJson>,
+}
 
 pub struct Parser;
 
@@ -13,7 +21,7 @@ impl Parser {
         Parser
     }
 
-    pub fn parse(&self, input: &str) -> Result<Vec<String>, ParseError<usize, Token, ()>> {
+    pub fn parse(&self, input: &str) -> Result<ParseOutput, ParseError<usize, Token, ()>> {
         let mut scanner: Scanner = Scanner::new(input);
         let mut semantics: Semantics = Semantics::new();
         let mut quad_generator: QuadGenerator = QuadGenerator::new();
@@ -23,19 +31,23 @@ impl Parser {
         for error in lex_errors {
             println!("{} {}", error.start, error.end);
         }
-        
+
         let semantic_errors = semantics.get_errors();
         for error in semantic_errors {
             println!("{}", error.message);
         }
 
-        println!("Saving results");
-
         let quads = quad_generator.get_results();
         quad_generator.save_results();
 
+        let dir_func = semantics.dir_func.get_dir_func();
+        let constants = MemoryManager::with_instance(|mm| mm.get_constants());
+
+        let _ = semantics.dir_func.delete_all();
+        MemoryManager::with_instance(|mm| mm.reset());
+
         let _ = result;
-        Ok(quads)
+        Ok(ParseOutput { quads, dir_func, constants })
     }
 }
 

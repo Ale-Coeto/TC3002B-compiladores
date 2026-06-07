@@ -1,0 +1,27 @@
+{
+  "quads": [
+    ["goto", -1, -1, 5],
+    ["=", 6000, -1, 1000],
+    ["endfunc", -1, -1, -1],
+    ["=", 6001, -1, 1000],
+    ["endfunc", -1, -1, -1],
+    ["era", -1, -1, -1],
+    ["param", 6002, -1, 0],
+    ["gosub", -1, -1, "saluda"],
+    ["era", -1, -1, -1],
+    ["param", 6000, -1, 0],
+    ["param", 6001, -1, 1],
+    ["gosub", -1, -1, "suma"],
+    ["end", -1, -1, -1]
+  ],
+  "functions": [
+    {"name": "suma", "start_index": 3, "local_count": 0, "temp_count": 0},
+    {"name": "saluda", "start_index": 1, "local_count": 0, "temp_count": 0},
+    {"name": "main", "start_index": 0, "local_count": 0, "temp_count": 0}
+  ],
+  "constants": [
+    {"address": 6000, "type": "int", "value": 1},
+    {"address": 6001, "type": "int", "value": 2},
+    {"address": 6002, "type": "int", "value": 7}
+  ]
+}

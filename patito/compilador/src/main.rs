@@ -4,20 +4,85 @@ mod semantics;
 mod quads;
 mod memory;
 
-use parser::Parser;
+use parser::{Parser, ParseOutput};
+use memory::ConstantValue;
 
 use lalrpop_util::lalrpop_mod;
 lalrpop_mod!(pub grammar, "/parser/grammar.rs");
 
+const OUTPUT_PATH: &str = "../output.json";
+
+fn compile(input_path: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let input = std::fs::read_to_string(input_path)?;
+    let output = Parser::new()
+        .parse(&input)
+        .map_err(|e| format!("parse error: {e:?}"))?;
+
+    std::fs::write(OUTPUT_PATH, build_json(&output))?;
+    Ok(OUTPUT_PATH.to_string())
+}
+
+fn escape(s: &str) -> String {
+    s.replace('\\', "\\\\").replace('"', "\\\"")
+}
+
+fn build_json(output: &ParseOutput) -> String {
+    let mut json = String::from("{\n");
+
+    // quads
+    json.push_str("  \"quads\": [\n");
+    for (i, q) in output.quads.iter().enumerate() {
+        let comma = if i + 1 < output.quads.len() { "," } else { "" };
+        let parts: Vec<&str> = q.splitn(4, ' ').collect();
+        let op = format!("\"{}\"", escape(parts[0]));
+        let operands: Vec<String> = parts[1..].iter().map(|p| {
+            if let Ok(n) = p.parse::<i64>() { n.to_string() }
+            else { format!("\"{}\"", escape(p)) }
+        }).collect();
+        json.push_str(&format!("    [{}, {}]{}\n", op, operands.join(", "), comma));
+    }
+    json.push_str("  ],\n");
+
+    // functions
+    json.push_str("  \"functions\": [\n");
+    for (i, f) in output.dir_func.iter().enumerate() {
+        let comma = if i + 1 < output.dir_func.len() { "," } else { "" };
+        json.push_str(&format!(
+            "    {{\"name\": \"{}\", \"start_index\": {}, \"local_count\": {}, \"temp_count\": {}}}{}\n",
+            escape(&f.name), f.start_index, f.local_count, f.temp_count, comma
+        ));
+    }
+    json.push_str("  ],\n");
+
+    // constants
+    json.push_str("  \"constants\": [\n");
+    for (i, c) in output.constants.iter().enumerate() {
+        let comma = if i + 1 < output.constants.len() { "," } else { "" };
+        let (type_str, val_str) = match &c.value {
+            ConstantValue::Entero(v) => ("int", v.to_string()),
+            ConstantValue::Flotante(v) => ("float", v.to_string()),
+        };
+        json.push_str(&format!(
+            "    {{\"address\": {}, \"type\": \"{}\", \"value\": {}}}{}\n",
+            c.address, type_str, val_str, comma
+        ));
+    }
+    json.push_str("  ]\n");
+
+    json.push('}');
+    json
+}
+
 fn main() {
-    let parser: Parser = Parser::new();
-    let input = include_str!("tests/input/basic.txt");
-    let result = parser.parse(input);
-    
-    // match result {
-    //     Ok(_) => println!("Program is valid"),
-    //     Err(e) => println!("Syntax error: {:?}", e),
-    // }
+    let args: Vec<String> = std::env::args().collect();
+    if args.len() < 2 {
+        eprintln!("usage: compilador <input_file>");
+        std::process::exit(1);
+    }
+    match compile(&args[1]) {
+        Ok(path) => println!("output written to {path}"),
+        Err(e) => { eprintln!("error: {e}"); std::process::exit(1); }
+    }
 }
 
 #[cfg(test)]
@@ -39,7 +104,7 @@ mod tests {
         let _guard = test_guard();
         MemoryManager::with_instance(|memory_manager| memory_manager.reset());
         let parser = Parser::new();
-        parser.parse(input).expect("parser should succeed")
+        parser.parse(input).expect("parser should succeed").quads
     }
 
     fn assert_output_matches(input: &str, expected_output: &str) {

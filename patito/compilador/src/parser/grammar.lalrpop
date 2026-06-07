@@ -55,8 +55,7 @@ extern {
 // Punto neurálgico 6 (final)
 pub Programa: () = {
     ProgramaSemantics ProgramaIdSemantics ";" OpcionesPrograma Inicio Cuerpo "fin" => {
-        let _ = semantics.dir_func.delete_all();
-        MemoryManager::with_instance(|memory_manager| memory_manager.reset());
+        quad_generator.push_end();
     }
 };
 
@@ -71,8 +70,8 @@ pub ProgramaSemantics: () = {
 // Punto neurálgico 2
 pub ProgramaIdSemantics: () = {
     <_id:Identificador> => {
-        let _ = semantics.dir_func.add_func(_id.clone(), FuncType::Program);
-        let _ = semantics.dir_func.add_func(format!("global-{}", _id.clone()).to_string(), FuncType::Nula);
+        let _ = semantics.dir_func.add_func(_id.clone(), FuncType::Program, 0);
+        let _ = semantics.dir_func.add_func(format!("global-{}", _id.clone()).to_string(), FuncType::Nula, 0);
     }
 }
 
@@ -108,8 +107,6 @@ VarsNewTable: () = {
 ListaVars: () = {
     ListaId ":" Tipo ";" AgregarVars => {
         let _ = semantics.dir_func.save_local_count();
-        let quad_counter = quad_generator.get_counter();
-        let _ = semantics.dir_func.add_func_start_index(quad_counter);
     },
 };
 
@@ -138,15 +135,16 @@ Funcs: () = {
     AddFuncSemantics DefFunc => (),
 };
 
+// Punto neurálgico Func 1
 AddFuncSemantics: () = {
     "nula" <_id:Identificador> => {
-        let _ = semantics.dir_func.add_func(_id.clone(), FuncType::Nula);
+        let _ = semantics.dir_func.add_func(_id.clone(), FuncType::Nula, quad_generator.get_counter());
     },
     "entero" <_id:Identificador> => {
-        let _ = semantics.dir_func.add_func(_id.clone(), FuncType::Entero);
+        let _ = semantics.dir_func.add_func(_id.clone(), FuncType::Entero, quad_generator.get_counter());
     },
     "flotante" <_id:Identificador> => {
-        let _ = semantics.dir_func.add_func(_id.clone(), FuncType::Flotante);
+        let _ = semantics.dir_func.add_func(_id.clone(), FuncType::Flotante, quad_generator.get_counter());
     }
 }
 

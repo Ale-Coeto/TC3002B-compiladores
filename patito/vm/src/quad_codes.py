@@ -1,0 +1,20 @@
+from enum import Enum
+
+class QuadCode(Enum):
+    ADD = '+'
+    SUB = '-'
+    MUL = '*'
+    DIV = '/'
+    ASSIGN = '='
+    LT = '<'
+    GT = '>'
+    EQ = '=='
+    NEQ = '!='
+    GOTO = 'goto'
+    GOTOF = 'gotof'
+    GOTOT = 'gotot'
+    ERA = 'era'
+    PARAM = 'param'
+    GOSUB = 'gosub'
+    ENDFUNC = 'endfunc'
+    END = 'end'
