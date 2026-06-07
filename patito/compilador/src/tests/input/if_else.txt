@@ -1,0 +1,11 @@
+programa main ;
+vars a : entero ;
+inicio
+{
+    si ( 1 < 2 ) { 
+        a = 1;
+    } sino {
+        a = 2;
+    } ;
+}
+fin

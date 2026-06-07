@@ -1,0 +1,10 @@
+programa main ;
+vars a : entero ;
+nula saluda ( mensaje : entero ) { { a = 1 ; } } ;
+entero suma ( a : entero , b : entero ) { { a = 2 ; } } ;
+inicio
+{
+    saluda ( 7 ) ;
+    suma ( 1 , 2 ) ;
+}
+fin

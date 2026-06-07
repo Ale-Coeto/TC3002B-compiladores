@@ -1,0 +1,522 @@
+grammar(semantics: &mut Semantics, quad_generator: &mut QuadGenerator);
+use crate::scanner::Token;
+use crate::semantics::Semantics;
+use crate::quads::QuadGenerator;
+use crate::semantics::func_types::FuncType;
+use crate::semantics::var_types::VarType;
+use crate::quads::operator_group::OperatorGroup;
+use crate::quads::quad_operators::QuadOperator;
+use crate::quads::quad_value::QuadValue;
+use crate::memory::MemoryManager;
+
+extern {
+    type Location = usize;
+    type Error = ();
+    
+    enum Token {
+        "programa" => Token::Programa,
+        "inicio" => Token::Inicio,
+        "fin" => Token::Fin,
+        "entero" => Token::Entero,
+        "flotante" => Token::Flotante,
+        "vars" => Token::Variable,
+        "escribe" => Token::Escribe,
+        "nula" => Token::Nula,
+        "mientras" => Token::Mientras,
+        "haz" => Token::Haz,
+        "si" => Token::Si,
+        "sino" => Token::Sino,
+        ";" => Token::PuntoYComa,
+        ":" => Token::DosPuntos,
+        "," => Token::Coma,
+        "{" => Token::LlaveAbrir,
+        "}" => Token::LlaveCerrar,
+        "[" => Token::CorcheteAbrir,
+        "]" => Token::CorcheteCerrar,
+        "(" => Token::ParentesisAbrir,
+        ")" => Token::ParentesisCerrar,
+        "==" => Token::ComparadorIgual,
+        "!=" => Token::NoIgual,
+        ">" => Token::Mayor,
+        "<" => Token::Menor,
+        "=" => Token::Igual,
+        "+" => Token::Mas,
+        "-" => Token::Menos,
+        "*" => Token::Multiplicar,
+        "/" => Token::Dividir,
+        
+        Entero => Token::ConstanteEntero(<i64>),
+        Flotante => Token::ConstanteFlotante(<f64>),
+        Letrero => Token::Letrero(<String>),
+        Identificador => Token::Identificador(<String>),
+    }
+}
+
+// Punto neurálgico 6 (final)
+pub Programa: () = {
+    ProgramaSemantics ProgramaIdSemantics ";" OpcionesPrograma Inicio Cuerpo "fin" => {
+        let _ = semantics.dir_func.delete_all();
+        MemoryManager::with_instance(|memory_manager| memory_manager.reset());
+    }
+};
+
+// Punto neurálgico 1
+pub ProgramaSemantics: () = {
+    "programa" => {
+        quad_generator.push_start();
+        let _ = semantics.dir_func.create_dir_func();
+    }
+}
+
+// Punto neurálgico 2
+pub ProgramaIdSemantics: () = {
+    <_id:Identificador> => {
+        let _ = semantics.dir_func.add_func(_id.clone(), FuncType::Program);
+        let _ = semantics.dir_func.add_func(format!("global-{}", _id.clone()).to_string(), FuncType::Nula);
+    }
+}
+
+// Punto neurálgico 
+pub Inicio: () = {
+    "inicio" => {
+        quad_generator.push_main();
+    }
+}
+
+OpcionesPrograma: () = {
+    Vars ListaFuncs => (),
+    ListaFuncs => (),
+};
+
+ListaFuncs: () = {
+    Funcs ListaFuncs => (),
+    => (),
+};
+
+Vars: () = {
+    VarsNewTable ListaVars => (),
+};
+
+// Punto neurálgico 3
+VarsNewTable: () = {
+    "vars" => {
+        let _ = semantics.dir_func.create_var_table();
+    }
+};
+
+// Punto neurálgico Func 4
+ListaVars: () = {
+    ListaId ":" Tipo ";" AgregarVars => {
+        let _ = semantics.dir_func.save_local_count();
+        let quad_counter = quad_generator.get_counter();
+        let _ = semantics.dir_func.add_func_start_index(quad_counter);
+    },
+};
+
+ListaId: () = {
+    NewVar AgregarId => (),
+};
+
+// Punto neurálgico 4
+NewVar: () = {
+    <_id:Identificador> => {
+        let _ = semantics.dir_func.add_var_name(_id.clone());
+    }
+};
+
+AgregarId: () = {
+    "," ListaId => (),
+    => (),
+};
+
+AgregarVars: () = {
+    ListaVars => (),
+    => (),
+};
+
+Funcs: () = {
+    AddFuncSemantics DefFunc => (),
+};
+
+AddFuncSemantics: () = {
+    "nula" <_id:Identificador> => {
+        let _ = semantics.dir_func.add_func(_id.clone(), FuncType::Nula);
+    },
+    "entero" <_id:Identificador> => {
+        let _ = semantics.dir_func.add_func(_id.clone(), FuncType::Entero);
+    },
+    "flotante" <_id:Identificador> => {
+        let _ = semantics.dir_func.add_func(_id.clone(), FuncType::Flotante);
+    }
+}
+
+// Punto neurálgico Func 5
+DefFunc: () = {
+    "(" ListaArgs ParamCount "{" OpcionVars Cuerpo "}" ";" => {
+        let _ = semantics.dir_func.release_var_table();
+        quad_generator.push_func_end();
+        let temp_count = quad_generator.get_temp_count();
+        let _ = semantics.dir_func.add_temp_count(temp_count);
+        MemoryManager::with_instance(|memory_manager| memory_manager.reset_function_scope());
+    },
+};
+
+// Punto neurálgico Func 3
+pub ParamCount: () = {
+    ")" => {
+        let _ = semantics.dir_func.save_param_count();
+    }
+};
+
+ListaArgs: () = {
+    Args => (),
+    => (),
+};
+
+Args: () = {
+    ArgsVarSemantics AgregarArgs => (),
+};
+
+// Punto neurálgico Func 2
+ArgsVarSemantics: () = {
+    <_id:Identificador> ":" "entero" => {
+        let _ = semantics.dir_func.add_var_name(_id.clone());
+        let _ = semantics.dir_func.add_vars(VarType::Entero);
+        let _ = semantics.dir_func.add_param(VarType::Entero);
+    },
+    <_id:Identificador> ":" "flotante" => {
+        let _ = semantics.dir_func.add_var_name(_id.clone());
+        let _ = semantics.dir_func.add_vars(VarType::Flotante);
+        let _ = semantics.dir_func.add_param(VarType::Flotante);
+    }
+};
+
+AgregarArgs: () = {
+    "," Args => (),
+    => (),
+};
+
+OpcionVars: () = {
+    Vars => (),
+    => (),
+};
+
+Cuerpo: () = {
+    "{" ListaEstatuto "}" => (),
+};
+
+ListaEstatuto: () = {
+    Estatuto ListaEstatuto => (),
+    => (),
+};
+
+// Punto neurálgico 5
+Tipo: () = {
+    "entero" => {
+        let _ = semantics.dir_func.add_vars(VarType::Entero);
+    },
+    "flotante" => {
+        let _ = semantics.dir_func.add_vars(VarType::Flotante);
+    },
+};
+
+Estatuto: () = {
+    AsignaOLlamada => (),
+    Condicion => (),
+    Ciclo => (),
+    Imprime => (),
+    "[" ListaEstatutoAdentro "]" => (),
+};
+
+ListaEstatutoAdentro: () = {
+    Estatuto ListaEstatutoAdentro => (),
+    => (),
+};
+
+AsignaOLlamada: () = {
+    // Punto neurálgico Quads 8
+    <_id:Identificador> "=" Expresion ";" => {
+        if let Ok((address, var_type)) = semantics.dir_func.get_var_info(&_id.clone()) {
+            quad_generator.push_id(address, var_type);
+        }
+        quad_generator.equals_quad();
+    },
+    CheckFuncId LlamadaSinId => (),
+};
+
+// Punto neurálgico Func Call 1
+pub CheckFuncId: () = {
+    <_id:Identificador> => {
+        let _ = semantics.dir_func.check_func_id(&_id.clone());
+        quad_generator.push_func_era();
+    }
+};
+
+Condicion: () = {
+    "si" "(" Expresion IfStart Cuerpo OpcionSino IfEnd => (),
+};
+
+// Punto neurálgico If 1
+pub IfStart: () = {
+    ")" => {
+        quad_generator.push_if_start();
+    }
+};
+
+// Punto neurálgico If 2
+pub IfEnd: () = {
+    ";" => {
+        quad_generator.push_if_end();
+    }
+};
+
+OpcionSino: () = {
+    Else Cuerpo => (),
+    => (),
+};
+
+// Punto neurálgico If 3
+pub Else: () = {
+    "sino" => {
+        quad_generator.push_else();
+    }
+};
+
+Ciclo: () = {
+    WhileStart "(" Expresion ")" WhileExpression Cuerpo WhileEnd => (),
+};
+
+// Punto neurálgico While 1
+pub WhileStart: () = {
+    "mientras"=> {
+        quad_generator.push_while_start();
+    }
+};
+
+// Punto neurálgico While 2
+pub WhileExpression: () = {
+    "haz" => {
+        quad_generator.push_while_expression();
+    }
+};
+
+// Punto neurálgico While 3
+pub WhileEnd: () = {
+    ";" => {
+        quad_generator.push_while_end();
+    }
+};
+
+LlamadaSinId: () = {
+    "(" ListaExpresion ")" ";" => {
+        let parameter_counter = quad_generator.get_parameter_counter();
+        let _ = semantics.dir_func.check_func_param_count(parameter_counter);
+        if let Ok(func_name) = semantics.dir_func.get_func_name() {
+            quad_generator.push_func_gosub(func_name);
+        }
+    },
+};
+
+Llamada: () = {
+    <_id:Identificador> LlamadaSinId => (),
+};
+
+ListaExpresion: () = {
+    ArgCheck AgregarExpresion => (),
+    => (),
+};
+
+// Punto neurálgico Func Call 2
+pub ArgCheck: () = {
+    Expresion => {
+        let (var_type, param_num) = quad_generator.push_func_arg();
+        let _ = semantics.dir_func.check_func_arg(var_type, param_num);
+    }
+};
+
+AgregarExpresion: () = {
+    MoveParamCounter ArgCheck AgregarExpresion => (),
+    => (),
+};
+
+// Punto neurálgico Func Call 3
+pub MoveParamCounter: () = {
+    "," => {
+        quad_generator.parameter_counter_next();
+    }
+};
+
+Imprime: () = {
+    "escribe" "(" OpcionImprime ")" ";" => (),
+};
+
+OpcionImprime: () = {
+    ElementoImprime AgregarOpcionImprime => (),
+};
+
+ElementoImprime: () = {
+    Expresion => (),
+    <_l:Letrero> => (),
+};
+
+AgregarOpcionImprime: () = {
+    "," ElementoImprime AgregarOpcionImprime => (),
+    => (),
+};
+
+Expresion: () = {
+    Exp OpcionExp => (),
+};
+
+OpcionExp: () = {
+    PushMayor Exp ChecarRel => (),
+    PushMenor Exp ChecarRel => (),
+    PushNoIgual Exp ChecarRel => (),
+    PushIgual Exp ChecarRel => (),
+    => (),
+};
+
+Exp: () = {
+    Termino AgregarTermino => (),
+};
+
+// Punto neurálgico Quads 4
+pub ChecarSumSub: () = {
+    => { 
+        quad_generator.check_operator(OperatorGroup::SumSub)
+    }
+};
+
+AgregarTermino: () = {
+    // Punto neurálgico Quads 3
+    PushMas Termino ChecarSumSub AgregarTermino => (),
+    // Punto neurálgico Quads 3
+    PushMenos Termino ChecarSumSub AgregarTermino => (),
+    => (),
+};
+
+// Punto neurálgico Quads 3
+pub PushMas: () = {
+    "+" => {
+        quad_generator.push_operator(QuadOperator::Mas);
+    }
+}
+
+// Punto neurálgico Quads 3
+pub PushMenos: () = {
+    "-" => {
+        quad_generator.push_operator(QuadOperator::Menos);
+    }
+}
+
+Termino: () = {
+    Factor AgregarFactor => (),
+};
+
+// Punto neurálgico Quads 6
+pub ChecarMultDiv: () = {
+    => {
+        quad_generator.check_operator(OperatorGroup::MultDiv)
+    }
+};
+
+AgregarFactor: () = {
+    // Punto neurálgico Quads 5
+    PushMult Factor ChecarMultDiv AgregarFactor => (),
+    // Punto neurálgico Quads 5
+    PushDiv Factor ChecarMultDiv AgregarFactor => (),
+    => (),
+};
+
+// Punto neurálgico Quads 5
+pub PushMult: () = {
+    "*" => {
+        quad_generator.push_operator(QuadOperator::Multiplicar);
+    }
+}
+
+// Punto neurálgico Quads 5
+pub PushDiv: () = {
+    "/" => {
+        quad_generator.push_operator(QuadOperator::Dividir);
+    }
+}
+
+// Punto neurálgico Quads 7
+pub ChecarRel: () = {
+    => {
+        quad_generator.check_operator(OperatorGroup::Rel)
+    }
+};
+
+// Punto neurálgico Quads 7
+pub PushMayor: () = {
+    ">" => {
+        quad_generator.push_operator(QuadOperator::Mayor);
+    }
+}
+
+
+// Punto neurálgico Quads 7
+pub PushMenor: () = {
+    "<" => {
+        quad_generator.push_operator(QuadOperator::Menor);
+    }
+}
+
+
+// Punto neurálgico Quads 7
+pub PushNoIgual: () = {
+    "!=" => {
+        quad_generator.push_operator(QuadOperator::NoIgual);
+    }
+}
+
+
+// Punto neurálgico Quads 7
+pub PushIgual: () = {
+    "==" => {
+        quad_generator.push_operator(QuadOperator::ComparadorIgual);
+    }
+}
+
+Factor: () = {
+    "(" Expresion ")" => (),
+    Signo Valor => (),
+    // Punto neurálgico Quads 2
+    <_c:Constante> => { quad_generator.push_constante(_c); },
+    PushId OpcionFactorId=> (),
+};
+
+// Punto neurálgico Quads 1
+pub PushId: () = {
+    <_id:Identificador> => {
+        if let Ok((address, var_type)) = semantics.dir_func.get_var_info(&_id.clone()) {
+            quad_generator.push_id(address, var_type);
+        }
+    }
+};
+
+OpcionFactorId: () = {
+    LlamadaSinId => (),
+    => (),
+};
+
+Signo: () = {
+    "-" => (),
+    "+" => (),
+};
+
+Valor: () = {
+    <_id:Identificador> => (),
+    <_c:Constante> => (),
+};
+
+Constante: QuadValue = {
+    <_c:Entero> => { 
+        QuadValue::Entero(_c) 
+    },
+    <_c:Flotante> => { 
+        QuadValue::Flotante(_c) 
+    },
+};
