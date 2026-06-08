@@ -7,6 +7,12 @@ flotante hola ( m: entero ) {
     }
 } ;
 
+nula hola () {
+    {
+        escribe( "Hola mundo" ) ;
+    }
+} ;
+
 nula resta ( n : entero ) {    
     vars 
     x: entero;
@@ -15,7 +21,7 @@ nula resta ( n : entero ) {
     { 
         a = hola() ;
         a = x + a;
-        si ( n @ 0 ) { 
+        si ( n > 0 ) { 
             escribe( "Restando 1 a ", n ) ;
             resta ( n - 1 ) ;
         } sino {
@@ -26,6 +32,7 @@ nula resta ( n : entero ) {
 
 inicio
 {
-    resta ( 2 ) ;
+    resta ( 2 ) ; @
+}
 }
 fin

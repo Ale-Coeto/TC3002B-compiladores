@@ -53,9 +53,10 @@ impl Parser {
 
         let lex_errors = scanner.get_errors();
         for error in lex_errors {
-            errors.push(CompileError { 
+            let token = input.get(error.start..error.end).unwrap_or("?");
+            errors.push(CompileError {
                 error_type: ErrorType::Lexic,
-                message: format!("Unrecognized token {} - {}", error.start, error.end).to_string() 
+                message: format!("Unrecognized token '{}'", token)
             })
         }
 

@@ -28,10 +28,10 @@ entero factorial_rec ( n : entero ) {
 
 inicio
 {
-    result_uno = factorial ( 4 ) ;
+    result_uno = factorial ( 8 ) ;
     escribe( "El resultado es: ", result_uno ) ;
 
-    result_rec = factorial_rec ( 4 ) ;
+    result_rec = factorial_rec ( 8 ) ;
     escribe( "El resultado recursivo es: ", result_rec ) ;
 }
 fin
