@@ -1,0 +1,31 @@
+programa main ;
+
+flotante hola ( m: entero ) {
+    {
+        escribe( "Hola mundo" ) ;
+        retorna 1.1;
+    }
+} ;
+
+nula resta ( n : entero ) {    
+    vars 
+    x: entero;
+    a,a : flotante;
+
+    { 
+        a = hola() ;
+        a = x + a;
+        si ( n @ 0 ) { 
+            escribe( "Restando 1 a ", n ) ;
+            resta ( n - 1 ) ;
+        } sino {
+            escribe( "Terminado" ) ;
+        };
+    }
+} ;
+
+inicio
+{
+    resta ( 2 ) ;
+}
+fin

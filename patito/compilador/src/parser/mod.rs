@@ -1,12 +1,35 @@
-use crate::scanner::Scanner;
+pub mod compile_error;
+
+use crate::scanner::{Scanner, Token};
 use crate::grammar::ProgramaParser;
-use crate::scanner::Token;
 use crate::semantics::Semantics;
 use crate::semantics::dir_func::FuncJson;
 use crate::memory::{MemoryManager, ConstantJson};
 use crate::quads::QuadGenerator;
-
+use crate::parser::compile_error::CompileError;
+use crate::parser::compile_error::ErrorType;
 use lalrpop_util::ParseError;
+
+fn format_parse_error(e: &ParseError<usize, Token, ()>) -> String {
+    fn clean_expected(expected: &[String]) -> String {
+        expected.iter()
+            .map(|s| s.trim_matches('"').to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
+
+    match e {
+        ParseError::UnrecognizedToken { token: (_, tok, _), expected } =>
+            format!("Parse error: expected ({}), received ({:?})", clean_expected(expected), tok),
+        ParseError::UnrecognizedEof { expected, .. } =>
+            format!("Parse error: unexpected end of file, expected ({})", clean_expected(expected)),
+        ParseError::InvalidToken { .. } =>
+            "Parse error: invalid token".to_string(),
+        ParseError::ExtraToken { token: (_, tok, _) } =>
+            format!("Parse error: unexpected extra token ({:?})", tok),
+        _ => format!("{:?}", e),
+    }
+}
 
 pub struct ParseOutput {
     pub quads: Vec<String>,
@@ -21,24 +44,30 @@ impl Parser {
         Parser
     }
 
-    pub fn parse(&self, input: &str) -> Result<ParseOutput, ParseError<usize, Token, ()>> {
+    pub fn parse(&self, input: &str) -> Result<ParseOutput, Vec<CompileError>> {
         let mut scanner: Scanner = Scanner::new(input);
         let mut semantics: Semantics = Semantics::new();
         let mut quad_generator: QuadGenerator = QuadGenerator::new();
+        let mut errors = Vec::new();
         let result = ProgramaParser::new().parse(&mut semantics, &mut quad_generator, &mut scanner);
 
         let lex_errors = scanner.get_errors();
         for error in lex_errors {
-            println!("{} {}", error.start, error.end);
+            errors.push(CompileError { 
+                error_type: ErrorType::Lexic,
+                message: format!("Unrecognized token {} - {}", error.start, error.end).to_string() 
+            })
         }
 
         let semantic_errors = semantics.get_errors();
         for error in semantic_errors {
-            println!("{}", error.message);
+            errors.push(CompileError {
+                error_type: ErrorType::Semantic,
+                message: format!("{}", error.message)
+            })
         }
 
         let quads = quad_generator.get_results();
-        // quad_generator.save_results();
 
         let dir_func = semantics.dir_func.get_dir_func();
         let constants = MemoryManager::with_instance(|mm| mm.get_constants());
@@ -46,8 +75,18 @@ impl Parser {
         let _ = semantics.dir_func.delete_all();
         MemoryManager::with_instance(|mm| mm.reset());
 
-        let _ = result;
-        Ok(ParseOutput { quads, dir_func, constants })
+        if let Err(e) = result {
+            errors.push(CompileError {
+                error_type: ErrorType::Sintactic,
+                message: format_parse_error(&e)
+            })
+        }
+        
+        if errors.is_empty() {
+            Ok(ParseOutput { quads, dir_func, constants })
+        } else {
+            Err(errors)
+        }
     }
 }
 
@@ -77,7 +116,7 @@ mod tests {
     }
 
     fn valid_vars() -> String {
-        "vars var1 : entero ;".to_string()
+        "vars var1 , x1 , x2 , x3 : entero ;".to_string()
     }
 
     fn valid_funcs() -> String {
@@ -143,7 +182,7 @@ mod tests {
 
         #[test]
         fn test_02_05_estatuto_llamada() {
-            let llamada = format!("fn_1 (2,5);");
+            let llamada = format!("f1() ;");
             let input = valid_programa(&llamada);
 
             let parser: Parser = Parser::new();
@@ -161,7 +200,7 @@ mod tests {
 
         #[test]
         fn test_02_07_estatuto_lista() {
-            let imprime = format!("[ escribe ( \"Hola mundo\" ); fn_1 (2,5); ]");
+            let imprime = format!("[ escribe ( \"Hola mundo\" ); f1 (); ]");
             let input = valid_programa(&imprime);
 
             let parser: Parser = Parser::new();

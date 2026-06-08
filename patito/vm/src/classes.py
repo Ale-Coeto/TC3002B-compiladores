@@ -29,3 +29,8 @@ class Program:
     quads: List[Quad]
     functions: List[Function]
     constants: List[Constant]
+
+@dataclass
+class Error:
+    type: str
+    message: str

@@ -1,5 +1,8 @@
 programa main ;
-vars a, result : entero ;
+vars 
+a, result : entero ;
+b, c : flotante ;
+
 nula saluda ( mensaje : entero ) { { 
     escribe( mensaje ) ;
 } } ;
@@ -22,6 +25,11 @@ inicio
     escribe( "Suma: ", result, suma(3, 11) ) ;
 
     a = 1;
+
+    b = 2.5;
+    c = b - 0.1;
+
+    escribe( "Valor de b: ", b, "Valor de c: ", c ) ;
 
     si ( a < 5 ) { 
         escribe( "a es menor que 5" ) ;

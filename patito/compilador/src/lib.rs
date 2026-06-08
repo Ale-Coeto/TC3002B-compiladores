@@ -5,6 +5,7 @@ pub mod quads;
 pub mod memory;
 
 use parser::{Parser, ParseOutput};
+use parser::compile_error::CompileError;
 use memory::ConstantValue;
 
 use lalrpop_util::lalrpop_mod;
@@ -13,17 +14,32 @@ lalrpop_mod!(pub grammar, "/parser/grammar.rs");
 
 pub fn compile(input_path: &str) -> Result<String, Box<dyn std::error::Error>> {
     let input = std::fs::read_to_string(input_path)?;
-    let output = Parser::new()
-        .parse(&input)
-        .map_err(|e| format!("parse error: {e:?}"))?;
 
     let output_path = std::path::Path::new(input_path)
         .with_extension("json")
         .to_string_lossy()
         .to_string();
 
-    std::fs::write(&output_path, build_json(&output))?;
+    let json = match Parser::new().parse(&input) {
+        Ok(output) => build_json(&output),
+        Err(errors) => build_error_json(&errors),
+    };
+
+    std::fs::write(&output_path, json)?;
     Ok(output_path)
+}
+
+fn build_error_json(errors: &[CompileError]) -> String {
+    let mut json = String::from("{\n  \"errors\": [\n");
+    for (i, e) in errors.iter().enumerate() {
+        let comma = if i + 1 < errors.len() { "," } else { "" };
+        json.push_str(&format!(
+            "    {{\"type\": \"{:?}\", \"message\": \"{}\"}}{}\n",
+            e.error_type, escape(&e.message), comma
+        ));
+    }
+    json.push_str("  ]\n}");
+    json
 }
 
 fn escape(s: &str) -> String {

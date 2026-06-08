@@ -28,4 +28,8 @@ impl Semantics {
         return &self.errors;
     }
 
+    pub fn push_error(&mut self, error: SemanticError) {
+        self.errors.push(error);
+    }
+
 }

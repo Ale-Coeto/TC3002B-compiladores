@@ -23,3 +23,14 @@ cd tarea2
 cargo build # Compila el proyecto
 cargo run # Ejecuta el programa principal
 ```
+
+<hr />
+
+[Compilador para el lenguaje Patito ](./patito): Implementación de un compilador para el lenguaje Patito, incluyendo análisis léxico, sintáctico y generación de código.
+
+```bash
+cd patito
+cargo build # Compila el proyecto
+cargo run -- ../recursivo.txt     # Ejecuta el compilador con el archivo de entrada recursivo.txt
+```
+

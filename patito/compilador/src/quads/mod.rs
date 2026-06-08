@@ -18,7 +18,6 @@ pub enum QuadOperand {
 }
 
 pub struct Quad {
-    id: i64,
     operator: QuadOperator,
     left_operand: Option<QuadOperand>,
     right_operand: Option<QuadOperand>,
@@ -26,9 +25,8 @@ pub struct Quad {
 }
 
 impl Quad {
-    pub fn new(id: i64, operator: QuadOperator, left_operand: Option<QuadOperand>, right_operand: Option<QuadOperand>, result: Option<QuadOperand>) -> Self {
+    pub fn new(operator: QuadOperator, left_operand: Option<QuadOperand>, right_operand: Option<QuadOperand>, result: Option<QuadOperand>) -> Self {
         Self {
-            id: id,
             operator: operator,
             left_operand: left_operand,
             right_operand: right_operand,
@@ -45,6 +43,7 @@ pub struct QuadGenerator {
     counter: i64,
     type_matching: TypeMatching,
     parameter_counter: i64,
+    arg_count: i64,
     temp_counter: i64,
 }
 
@@ -58,6 +57,7 @@ impl QuadGenerator {
             counter: 0,
             type_matching: TypeMatching::new(),
             parameter_counter: 0,
+            arg_count: 0,
             temp_counter: 0,
         }
     }
@@ -115,7 +115,6 @@ impl QuadGenerator {
 
     pub fn push_start(&mut self) {
         self.quad_queue.push_back(Quad::new(
-            self.counter,
             QuadOperator::GoTo,
             None,
             None,
@@ -167,7 +166,6 @@ impl QuadGenerator {
         if let Some((right_addr, right_type)) = self.variable_stack.pop() {
             if let Some((left_addr, left_type)) = self.variable_stack.pop() {
                 let quad = Quad {
-                    id: self.counter,
                     operator: QuadOperator::Asignacion,
                     left_operand: Some(QuadOperand::Address(left_addr, left_type)),
                     right_operand: None,
@@ -179,7 +177,7 @@ impl QuadGenerator {
         }
     }
 
-    pub fn check_operator(&mut self, group: OperatorGroup) {
+    pub fn check_operator(&mut self, group: OperatorGroup) -> Option<String> {
         if let Some(&top_operator) = self.operator_stack.last() {
             if group.matches(top_operator) {
                 let right_operand_opt = self.variable_stack.pop();
@@ -195,7 +193,6 @@ impl QuadGenerator {
                             .expect("unable to allocate temporary address");
                             self.temp_counter += 1;
                             self.quad_queue.push_back(Quad::new(
-                                self.counter,
                                 operator,
                                 Some(QuadOperand::Address(left_addr, left_type)),
                                 Some(QuadOperand::Address(right_addr, right_type)),
@@ -203,17 +200,19 @@ impl QuadGenerator {
                             ));
                             self.counter += 1;
                             self.variable_stack.push((new_address, result_type));
+                        } else {
+                            return Some(format!("Tipo incompatible en operador {:?}", operator));
                         }
                     }
                 }
             }
         }
+        None
     }
 
     pub fn push_print(&mut self) {
         if let Some((top_variable, top_type)) = self.variable_stack.pop() {
             self.quad_queue.push_back(Quad::new(
-                self.counter,
                 QuadOperator::Imprime,
                 None,
                 None,
@@ -229,7 +228,6 @@ impl QuadGenerator {
                 println!("TYPE Mismatch");
             } else {
                 self.quad_queue.push_back(Quad::new(
-                    self.counter,
                     QuadOperator::GoToF,
                     Some(QuadOperand::Address(top_variable, top_type)),
                     None,
@@ -243,7 +241,6 @@ impl QuadGenerator {
 
     pub fn push_else(&mut self) {
         self.quad_queue.push_back(Quad::new(
-            self.counter,
             QuadOperator::GoTo,
             None,
             None,
@@ -278,7 +275,6 @@ impl QuadGenerator {
                 println!("TYPE Mismatch");
             } else {
                 self.quad_queue.push_back(Quad::new(
-                    self.counter,
                     QuadOperator::GoToF,
                     Some(QuadOperand::Address(top_variable, top_type)),
                     None,
@@ -293,7 +289,6 @@ impl QuadGenerator {
     pub fn push_while_end(&mut self) {
         if let (Some(pending_jump), Some(return_id)) = (self.jumps_stack.pop(), self.jumps_stack.pop()) {
             self.quad_queue.push_back(Quad::new(
-                self.counter,
                 QuadOperator::GoTo,
                 None,
                 None,
@@ -308,8 +303,8 @@ impl QuadGenerator {
 
     pub fn push_func_era(&mut self, func_name: String) {
         self.parameter_counter = 0;
+        self.arg_count = 0;
         self.quad_queue.push_back(Quad::new(
-            self.counter,
             QuadOperator::Era,
             None,
             None,
@@ -321,20 +316,28 @@ impl QuadGenerator {
         self.parameter_counter
     }
 
+    pub fn get_arg_count(&self) -> i64 {
+        self.arg_count
+    }
+
     pub fn parameter_counter_next(&mut self) {
         self.parameter_counter += 1;
+    }
+
+    pub fn peek_top_type(&self) -> Option<VarType> {
+        self.variable_stack.last().map(|(_, vt)| *vt)
     }
 
     pub fn push_func_arg(&mut self) -> (VarType, i64) {
         if let Some((top_var, top_type)) = self.variable_stack.pop() {
             self.quad_queue.push_back(Quad::new(
-                self.counter,
                 QuadOperator::Param,
                 Some(QuadOperand::Address(top_var, top_type)),
                 None,
                 Some(QuadOperand::Address(self.parameter_counter, VarType::Entero)),
             ));
             self.counter += 1;
+            self.arg_count += 1;
             return (top_type, self.parameter_counter);
         }
         (VarType::Entero, -1)
@@ -342,7 +345,6 @@ impl QuadGenerator {
 
     pub fn push_func_gosub(&mut self, func_name: String, return_info: Option<(i64, VarType)>) {
         self.quad_queue.push_back(Quad::new(
-            self.counter,
             QuadOperator::GoSub,
             None,
             None,
@@ -356,7 +358,6 @@ impl QuadGenerator {
             }).expect("unable to allocate temp for return value");
             self.temp_counter += 1;
             self.quad_queue.push_back(Quad::new(
-                self.counter,
                 QuadOperator::Asignacion,
                 Some(QuadOperand::Address(return_addr, return_type)),
                 None,
@@ -370,7 +371,6 @@ impl QuadGenerator {
     pub fn push_return(&mut self, address: i64) {
         if let Some((top_var, top_type)) = self.variable_stack.pop() {
             self.quad_queue.push_back(Quad::new(
-                self.counter,
                 QuadOperator::Return,
                 Some(QuadOperand::Address(top_var, top_type)),
                 None,
@@ -382,7 +382,6 @@ impl QuadGenerator {
 
     pub fn push_func_end(&mut self) {
         self.quad_queue.push_back(Quad::new(
-            self.counter,
             QuadOperator::EndFunc,
             None,
             None,
@@ -393,7 +392,6 @@ impl QuadGenerator {
 
      pub fn push_end(&mut self) {
         self.quad_queue.push_back(Quad::new(
-            self.counter,
             QuadOperator::End,
             None,
             None,

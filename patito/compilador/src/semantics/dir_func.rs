@@ -222,11 +222,15 @@ impl DirFunc {
         let func_row = dir_func.get(call_func)
             .ok_or(SemanticError { message: format!("Función '{}' no encontrada", call_func) })?;
 
-        let parameters = func_row.parameters.as_ref()
-            .ok_or(SemanticError { message: format!("La función '{}' no tiene argumentos", call_func) })?; 
+        let Some(parameters) = func_row.parameters.as_ref() else {
+            if args_count != 0 {
+                return Err(SemanticError { message: format!("La función '{}' no recibe argumentos", call_func) });
+            }
+            return Ok(());
+        };
 
-        if parameters.len() as i64 - 1 != args_count {
-            return Err(SemanticError { message: format!("El número de argumentos de la función {} no coincide", call_func) })
+        if parameters.len() as i64 != args_count {
+            return Err(SemanticError { message: format!("El número de argumentos de la función '{}' no coincide", call_func) })
         }
         Ok(())
     }
@@ -324,7 +328,6 @@ impl DirFunc {
 
         for name in self.curr_vars.drain(..) {
             if var_table.contains_key(&name) {
-                println!("VARIABLE DUPLICADA");
                 return Err(SemanticError { message: "Duplicate Variable".to_string() });
             }
             let address = MemoryManager::with_instance(|memory_manager| {
@@ -362,6 +365,35 @@ impl DirFunc {
             .ok_or(SemanticError { message: format!("Variable '{}' not found", name) })?;
 
         Ok((entry.address, entry.var_type))
+    }
+
+    pub fn check_return_type(&self, returned_type: VarType) -> Result<(), SemanticError> {
+        let dir_func = self.dir_func.as_ref()
+            .ok_or(SemanticError { message: "No dir_func created".to_string() })?;
+        let curr_func = self.curr_func.as_ref()
+            .ok_or(SemanticError { message: "No current function".to_string() })?;
+        let func_row = dir_func.get(curr_func)
+            .ok_or(SemanticError { message: "Function not found".to_string() })?;
+
+        match func_row.func_type {
+            FuncType::Nula | FuncType::Program => {
+                Err(SemanticError { message: format!("La función '{}' es nula y no puede retornar un valor", curr_func) })
+            },
+            FuncType::Entero => {
+                if returned_type != VarType::Entero {
+                    Err(SemanticError { message: format!("Tipo de retorno incorrecto en '{}': se esperaba entero", curr_func) })
+                } else {
+                    Ok(())
+                }
+            },
+            FuncType::Flotante => {
+                if returned_type != VarType::Flotante && returned_type != VarType::Entero {
+                    Err(SemanticError { message: format!("Tipo de retorno incorrecto en '{}': se esperaba flotante", curr_func) })
+                } else {
+                    Ok(())
+                }
+            },
+        }
     }
 
     pub fn delete_all(&mut self) -> Result<(), SemanticError> {

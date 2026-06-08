@@ -14,14 +14,21 @@ BINARY_OPS = {
     QuadCode.NEQ: (op.ne, lambda l, r: f"Comparing: {l} != {r}"),
 }
 
+RED   = "\033[91m"
+RESET = "\033[0m"
+
 class VirtualMachine:
-    def __init__(self, program, verbose=False):
+    def __init__(self, program=None, verbose=False):
         self.instruction_pointer = 0
         self.call_stack = []
         self.program = program
-        self.functions = {func.name: func for func in program.functions}
-        self.memory = Memory(program.constants)
+        self.functions = {func.name: func for func in program.functions} if program else {}
+        self.memory = Memory(program.constants) if program else None
         self.logger = Logger(verbose)
+
+    def errors(self, errors):
+        for e in errors:
+            print(f"{RED}[{e.type}]{RESET} {e.message}")
 
     def run(self):
         while True:

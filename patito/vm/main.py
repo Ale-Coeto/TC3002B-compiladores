@@ -4,13 +4,19 @@ import sys
 
 from src.virtual_machine import VirtualMachine
 from src.quad_codes import QuadCode
-from src.classes import Constant, Function, Program, Quad
+from src.classes import Constant, Error, Function, Program, Quad
 
 def main():
     json_file = sys.argv[1]
 
     with open(json_file, "r") as f:
         data = json.load(f)
+
+    if "errors" in data:
+        errors = [Error(**e) for e in data["errors"]]
+        vm = VirtualMachine()
+        vm.errors(errors)
+        return
 
     program = Program(
         quads=[
