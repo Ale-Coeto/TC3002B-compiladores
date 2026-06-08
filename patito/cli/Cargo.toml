@@ -1,0 +1,8 @@
+[package]
+name = "patito"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+compilador = { path = "../compilador" }
+clap = { version = "4", features = ["derive"] }

@@ -14,3 +14,6 @@ target/
 # Other
 *.pdf
 *.zip
+
+# Patito compiled
+/patito/tests/*.json

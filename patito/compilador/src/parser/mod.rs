@@ -38,7 +38,7 @@ impl Parser {
         }
 
         let quads = quad_generator.get_results();
-        quad_generator.save_results();
+        // quad_generator.save_results();
 
         let dir_func = semantics.dir_func.get_dir_func();
         let constants = MemoryManager::with_instance(|mm| mm.get_constants());

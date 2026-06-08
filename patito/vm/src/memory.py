@@ -62,8 +62,10 @@ class Memory:
     def is_int(self, address, value):
         if self.global_range[0] <= address <= self.global_range[1]:
             return self.global_int_range[0] <= address <= self.global_int_range[1]
-        elif self.local_range[0] <= address <= self.local_range[1]:
-            return self.local_int_range[0] <= address <= self.local_int_range[1]
+        elif self.local_int_range[0] <= address <= self.local_int_range[1]:
+            return True
+        elif self.local_float_range[0] <= address <= self.local_float_range[1]:
+            return False
         elif self.temp_int_range[0] <= address <= self.temp_int_range[1]:
             return True
         elif self.temp_float_range[0] <= address <= self.temp_float_range[1]:

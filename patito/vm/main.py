@@ -1,12 +1,15 @@
 
 import json
+import sys
 
 from src.virtual_machine import VirtualMachine
 from src.quad_codes import QuadCode
 from src.classes import Constant, Function, Program, Quad
 
 def main():
-    with open("../output.json", "r") as f:
+    json_file = sys.argv[1]
+
+    with open(json_file, "r") as f:
         data = json.load(f)
 
     program = Program(

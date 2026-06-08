@@ -17,7 +17,7 @@ BINARY_OPS = {
 class VirtualMachine:
     def __init__(self, program, verbose=False):
         self.instruction_pointer = 0
-        self.back_to_pointer = 0
+        self.call_stack = []
         self.program = program
         self.functions = {func.name: func for func in program.functions}
         self.memory = Memory(program.constants)
@@ -53,13 +53,13 @@ class VirtualMachine:
                 message = f"Creating new local memory for function {curr_instruction.result}"
 
             elif curr_operator == QuadCode.PARAM:
-                self.memory.set_param(curr_instruction.left_operand)
+                self.memory.set_param(curr_instruction.left_operand) 
                 value = self.memory.get_value(curr_instruction.left_operand)
                 message = f"Setting parameter #{curr_instruction.result+1} with value: {value}"
 
             elif curr_operator == QuadCode.GOSUB:
                 self.memory.use_new_local_memory()
-                self.back_to_pointer = self.instruction_pointer
+                self.call_stack.append(self.instruction_pointer)
                 self.instruction_pointer = self.functions[curr_instruction.result].start_index
                 message = f"Jumping to function {curr_instruction.result}, instruction {self.instruction_pointer}"
 
@@ -69,7 +69,7 @@ class VirtualMachine:
                 message = f"Returning value: {value}"
 
             elif curr_operator == QuadCode.ENDFUNC:
-                self.instruction_pointer = self.back_to_pointer
+                self.instruction_pointer = self.call_stack.pop()
                 self.memory.release_local_memory()
                 message = "Function ended, clearing memory"
 

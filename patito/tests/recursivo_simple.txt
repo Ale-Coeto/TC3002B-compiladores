@@ -1,0 +1,19 @@
+programa main ;
+
+nula resta ( n : entero ) {    
+
+    { 
+        si ( n > 0 ) { 
+            escribe( "Restando 1 a ", n ) ;
+            resta ( n - 1 ) ;
+        } sino {
+            escribe( "Terminado" ) ;
+        };
+    }
+} ;
+
+inicio
+{
+    resta ( 2 ) ;
+}
+fin

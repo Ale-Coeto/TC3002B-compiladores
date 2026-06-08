@@ -1,0 +1,37 @@
+programa main ;
+vars result_uno, result_rec : entero ;
+
+entero factorial ( n : entero ) {    
+    vars resultado : entero ;
+
+    { 
+        resultado = 1;
+
+        mientras ( n > 1 ) haz {
+            resultado = resultado * n ;
+            n = n - 1 ;
+        } ;
+
+        retorna resultado ;
+    }
+} ;
+
+entero factorial_rec ( n : entero ) {    
+    { 
+        si ( n < 2 ) { 
+            retorna n ;
+        } sino {
+            retorna factorial_rec ( n - 1 ) * n ;
+        };
+    }
+} ;
+
+inicio
+{
+    result_uno = factorial ( 4 ) ;
+    escribe( "El resultado es: ", result_uno ) ;
+
+    result_rec = factorial_rec ( 4 ) ;
+    escribe( "El resultado recursivo es: ", result_rec ) ;
+}
+fin

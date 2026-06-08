@@ -1,0 +1,43 @@
+programa main ;
+vars result_uno, result_rec : entero ;
+
+entero fib ( n : entero ) {    
+    vars contador, primero, segundo, resultado : entero ;
+
+    { 
+        contador = 0;
+        primero = 0;
+        segundo = 1;
+        resultado = 0;
+
+        mientras ( contador < n ) haz {
+            resultado = primero + segundo ;
+            primero = segundo ;
+            segundo = resultado ;
+            contador = contador + 1 ;
+        } ;
+
+        retorna resultado ;
+    }
+} ;
+
+entero fib_rec ( n : entero ) {    
+
+    { 
+        si ( n < 2 ) { 
+            retorna n ;
+        } sino {
+            retorna fib ( n - 1 ) + fib ( n - 2 ) ;
+        };
+    }
+} ;
+
+inicio
+{
+    result_uno = fib ( 6 ) ;
+    escribe( "El resultado es: ", result_uno ) ;
+
+    result_rec = fib_rec ( 6 ) ;
+    escribe( "El resultado recursivo es: ", result_rec ) ;
+}
+fin
