@@ -14,6 +14,7 @@ pub const TEMP_INT_START: i64 = 3000;
 pub const TEMP_FLOAT_START: i64 = 4000;
 pub const TEMP_BOOL_START: i64 = 5000;
 pub const CONSTANTS_START: i64 = 6000;
+pub const CONSTANTS_STRING_START: i64 = 7000;
 
 const GLOBAL_LOCAL_MEMORY_SIZE: i64 = 500;
 const TEMP_MEMORY_SIZE: i64 = 1000;
@@ -27,13 +28,16 @@ pub struct MemoryManager {
     float_temp_index: i64,
     bool_temp_index: i64,
     constants_index: i64,
+    string_index: i64,
     int_constants_dir: HashMap<i64, i64>,
     float_constants_dir: HashMap<u64, i64>,
+    string_constants_dir: HashMap<String, i64>,
 }
 
 pub enum ConstantValue {
     Entero(i64),
     Flotante(f64),
+    Letrero(String),
 }
 
 pub struct ConstantJson {
@@ -54,8 +58,10 @@ impl MemoryManager {
             float_temp_index: 0,
             bool_temp_index: 0,
             constants_index: 0,
+            string_index: 0,
             int_constants_dir: HashMap::new(),
             float_constants_dir: HashMap::new(),
+            string_constants_dir: HashMap::new(),
         }
     }
 
@@ -81,6 +87,7 @@ impl MemoryManager {
         self.constants_index = 0;
         self.int_constants_dir.clear();
         self.float_constants_dir.clear();
+        self.string_constants_dir.clear();
     }
 
     pub fn reset_function_scope(&mut self) {
@@ -198,6 +205,16 @@ impl MemoryManager {
         }
     }
 
+    pub fn get_string_address(&mut self, value: String) -> i64 {
+        if let Some(address) = self.string_constants_dir.get(&value) {
+            return *address;
+        }
+        let address = CONSTANTS_STRING_START + self.string_index;
+        self.string_index += 1;
+        self.string_constants_dir.insert(value, address);
+        address
+    }
+
     pub fn get_constants(&self) -> Vec<ConstantJson> {
         let mut constants: Vec<ConstantJson> = self.int_constants_dir
             .iter()
@@ -213,11 +230,20 @@ impl MemoryManager {
                         value: ConstantValue::Flotante(f64::from_bits(bits)),
                     })
             )
+            .chain(
+                self.string_constants_dir
+                    .iter()
+                    .map(|(val, &address)| ConstantJson {
+                        address,
+                        value: ConstantValue::Letrero(val.clone()),
+                    })
+            )
             .collect();
 
         constants.sort_by_key(|c| c.address);
         constants
     }
+
 }
 
 #[cfg(test)]

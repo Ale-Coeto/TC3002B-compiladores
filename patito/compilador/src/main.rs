@@ -17,6 +17,7 @@ fn compile(input_path: &str) -> Result<String, Box<dyn std::error::Error>> {
     let output = Parser::new()
         .parse(&input)
         .map_err(|e| format!("parse error: {e:?}"))?;
+    // println!("{:?}", output.quads);
 
     std::fs::write(OUTPUT_PATH, build_json(&output))?;
     Ok(OUTPUT_PATH.to_string())
@@ -48,8 +49,8 @@ fn build_json(output: &ParseOutput) -> String {
     for (i, f) in output.dir_func.iter().enumerate() {
         let comma = if i + 1 < output.dir_func.len() { "," } else { "" };
         json.push_str(&format!(
-            "    {{\"name\": \"{}\", \"start_index\": {}, \"local_count\": {}, \"temp_count\": {}}}{}\n",
-            escape(&f.name), f.start_index, f.local_count, f.temp_count, comma
+            "    {{\"name\": \"{}\", \"address\": \"{}\", \"start_index\": {}, \"local_count\": {}, \"temp_count\": {}}}{}\n",
+            escape(&f.name), f.address, f.start_index, f.local_count, f.temp_count, comma
         ));
     }
     json.push_str("  ],\n");
@@ -61,6 +62,7 @@ fn build_json(output: &ParseOutput) -> String {
         let (type_str, val_str) = match &c.value {
             ConstantValue::Entero(v) => ("int", v.to_string()),
             ConstantValue::Flotante(v) => ("float", v.to_string()),
+            ConstantValue::Letrero(v) => ("string", format!("\"{}\"", escape(v))),
         };
         json.push_str(&format!(
             "    {{\"address\": {}, \"type\": \"{}\", \"value\": {}}}{}\n",

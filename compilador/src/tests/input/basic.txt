@@ -1,8 +1,0 @@
-programa main ;
-vars a , b : entero ;
-inicio
-{
-    a = 1;
-    b = 2;
-}
-fin

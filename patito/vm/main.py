@@ -24,7 +24,7 @@ def main():
         ]
     )
 
-    vm = VirtualMachine(program)
+    vm = VirtualMachine(program, verbose=False)
     vm.run()
 
 if __name__ == "__main__":

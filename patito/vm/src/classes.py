@@ -13,6 +13,7 @@ class Quad:
 @dataclass
 class Function:
     name: str
+    address: int
     start_index: int
     local_count: int
     temp_count: int

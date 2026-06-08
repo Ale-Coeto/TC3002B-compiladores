@@ -1,0 +1,37 @@
+programa main ;
+vars a, result : entero ;
+nula saluda ( mensaje : entero ) { { 
+    escribe( mensaje ) ;
+} } ;
+
+entero suma ( a : entero , b : entero ) { 
+    vars resultado: entero;
+    
+    { 
+
+    resultado = a + b;
+    retorna resultado ;
+    }
+} ;
+
+inicio
+{
+    saluda ( 7 ) ;
+
+    result = suma ( 1 , 2 ) ;
+    escribe( "Suma: ", result, suma(3, 11) ) ;
+
+    a = 1;
+
+
+    escribe( "Probando el ciclo" ) ;
+    mientras ( a < 5 ) haz { 
+        escribe( a ) ;
+        a = a + 1 ;
+    } ;
+    a = 5;
+
+
+
+}
+fin

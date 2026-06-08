@@ -30,6 +30,9 @@ pub enum Token {
     #[token("nula")]
     Nula,
 
+    #[token("retorna")]
+    Retorna,
+
     // Condicionales y ciclos
     #[token("mientras")]
     Mientras,

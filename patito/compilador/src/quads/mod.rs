@@ -151,6 +151,14 @@ impl QuadGenerator {
         self.variable_stack.push((address, var_type));
     }
 
+    pub fn push_string(&mut self, value: String) {
+        let address = MemoryManager::with_instance(|memory_manager| {
+            memory_manager.get_string_address(value)
+        });
+
+        self.variable_stack.push((address, VarType::Entero));
+    }
+
     pub fn push_operator(&mut self, operator: QuadOperator) {
         self.operator_stack.push(operator);
     }
@@ -199,6 +207,19 @@ impl QuadGenerator {
                     }
                 }
             }
+        }
+    }
+
+    pub fn push_print(&mut self) {
+        if let Some((top_variable, top_type)) = self.variable_stack.pop() {
+            self.quad_queue.push_back(Quad::new(
+                self.counter,
+                QuadOperator::Imprime,
+                None,
+                None,
+                Some(QuadOperand::Address(top_variable, top_type)),
+            ));
+            self.counter += 1;
         }
     }
 
@@ -285,14 +306,14 @@ impl QuadGenerator {
         }
     }
 
-    pub fn push_func_era(&mut self) {
+    pub fn push_func_era(&mut self, func_name: String) {
         self.parameter_counter = 0;
         self.quad_queue.push_back(Quad::new(
             self.counter,
             QuadOperator::Era,
             None,
             None,
-            None,
+            Some(QuadOperand::Name(func_name)),
         ));
         self.counter += 1;
     }
@@ -319,7 +340,7 @@ impl QuadGenerator {
         (VarType::Entero, -1)
     }
 
-    pub fn push_func_gosub(&mut self, func_name: String) {
+    pub fn push_func_gosub(&mut self, func_name: String, return_info: Option<(i64, VarType)>) {
         self.quad_queue.push_back(Quad::new(
             self.counter,
             QuadOperator::GoSub,
@@ -328,6 +349,35 @@ impl QuadGenerator {
             Some(QuadOperand::Name(func_name)),
         ));
         self.counter += 1;
+
+        if let Some((return_addr, return_type)) = return_info {
+            let temp = MemoryManager::with_instance(|mm| {
+                mm.get_available_temp_address(return_type)
+            }).expect("unable to allocate temp for return value");
+            self.temp_counter += 1;
+            self.quad_queue.push_back(Quad::new(
+                self.counter,
+                QuadOperator::Asignacion,
+                Some(QuadOperand::Address(return_addr, return_type)),
+                None,
+                Some(QuadOperand::Address(temp, return_type)),
+            ));
+            self.counter += 1;
+            self.variable_stack.push((temp, return_type));
+        }
+    }
+
+    pub fn push_return(&mut self, address: i64) {
+        if let Some((top_var, top_type)) = self.variable_stack.pop() {
+            self.quad_queue.push_back(Quad::new(
+                self.counter,
+                QuadOperator::Return,
+                Some(QuadOperand::Address(top_var, top_type)),
+                None,
+                Some(QuadOperand::Address(address, VarType::Entero)),
+            ));
+            self.counter += 1;
+        }
     }
 
     pub fn push_func_end(&mut self) {

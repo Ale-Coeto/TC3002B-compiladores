@@ -31,6 +31,7 @@ pub struct DirFunc {
 
 pub struct FuncJson {
     pub name: String,
+    pub address: i64,
     pub start_index: i64,
     pub local_count: i64,
     pub temp_count: i64,
@@ -152,7 +153,11 @@ impl DirFunc {
         let curr_func = self.curr_func.as_ref()
             .ok_or(SemanticError { message: "No current function".to_string() })?;
         
-        dir_func.entry(curr_func.clone()).and_modify(|f| f.var_table = Some(HashMap::new()));
+        dir_func.entry(curr_func.clone()).and_modify(|f| {
+            if f.var_table.is_none() {
+                f.var_table = Some(HashMap::new());
+            }
+        });
         Ok(())
     }
 
@@ -239,6 +244,30 @@ impl DirFunc {
         Ok(func_row.address)
     }
 
+    pub fn get_call_func_return_info(&self) -> Option<(i64, VarType)> {
+        let dir_func = self.dir_func.as_ref()?;
+        let call_func = self.call_func.as_ref()?;
+        let func_row = dir_func.get(call_func)?;
+        match func_row.func_type {
+            FuncType::Nula | FuncType::Program => None,
+            FuncType::Entero => Some((func_row.address, VarType::Entero)),
+            FuncType::Flotante => Some((func_row.address, VarType::Flotante)),
+        }
+    }
+
+    pub fn get_curr_address(&self) -> Result<i64, SemanticError> {
+        let dir_func = self.dir_func.as_ref()
+            .ok_or(SemanticError { message: "No dir_func created".to_string() })?;
+
+        let curr_func = self.curr_func.as_ref()
+            .ok_or(SemanticError { message: "No function call in progress".to_string() })?;
+
+        let func_row = dir_func.get(curr_func)
+            .ok_or(SemanticError { message: format!("Función '{}' no encontrada", curr_func) })?;
+
+        Ok(func_row.address)
+    }
+
     pub fn get_func_name(&self) -> Result<String, SemanticError> {
         let call_func = self.call_func.as_ref()
             .ok_or(SemanticError { message: "No function call in progress".to_string() })?;
@@ -254,6 +283,7 @@ impl DirFunc {
             .filter(|(name, _)| !name.starts_with("global-"))
             .map(|(name, details)| FuncJson {
                 name: name.clone(),
+                address: details.address,
                 start_index: details.start_index,
                 local_count: details.memory.1,
                 temp_count: details.memory.2,

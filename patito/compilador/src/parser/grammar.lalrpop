@@ -44,6 +44,7 @@ extern {
         "-" => Token::Menos,
         "*" => Token::Multiplicar,
         "/" => Token::Dividir,
+        "retorna" => Token::Retorna,
         
         Entero => Token::ConstanteEntero(<i64>),
         Flotante => Token::ConstanteFlotante(<f64>),
@@ -150,13 +151,19 @@ AddFuncSemantics: () = {
 
 // Punto neurálgico Func 5
 DefFunc: () = {
-    "(" ListaArgs ParamCount "{" OpcionVars Cuerpo "}" ";" => {
+    "(" FuncArgStart ListaArgs ParamCount "{" OpcionVars Cuerpo "}" ";" => {
         let _ = semantics.dir_func.release_var_table();
         quad_generator.push_func_end();
         let temp_count = quad_generator.get_temp_count();
         let _ = semantics.dir_func.add_temp_count(temp_count);
         MemoryManager::with_instance(|memory_manager| memory_manager.reset_function_scope());
     },
+};
+
+pub FuncArgStart: () = {
+    => {
+        let _ = semantics.dir_func.create_var_table();
+    }
 };
 
 // Punto neurálgico Func 3
@@ -200,8 +207,23 @@ OpcionVars: () = {
 };
 
 Cuerpo: () = {
-    "{" ListaEstatuto "}" => (),
+    "{" ListaEstatuto Return"}" => (),
 };
+
+Return: () = {
+    "retorna" Expresion ";" => {
+        let func_name = semantics.dir_func.get_curr_address();
+        match func_name {
+            Ok(name) => {
+                quad_generator.push_return(name);
+            },
+            Err(_) => {
+                // Handle error if needed
+            }
+        }
+    },
+    => (),
+}
 
 ListaEstatuto: () = {
     Estatuto ListaEstatuto => (),
@@ -219,10 +241,10 @@ Tipo: () = {
 };
 
 Estatuto: () = {
+    Imprime => (),
     AsignaOLlamada => (),
     Condicion => (),
     Ciclo => (),
-    Imprime => (),
     "[" ListaEstatutoAdentro "]" => (),
 };
 
@@ -239,6 +261,7 @@ AsignaOLlamada: () = {
         }
         quad_generator.equals_quad();
     },
+
     CheckFuncId LlamadaSinId => (),
 };
 
@@ -246,7 +269,7 @@ AsignaOLlamada: () = {
 pub CheckFuncId: () = {
     <_id:Identificador> => {
         let _ = semantics.dir_func.check_func_id(&_id.clone());
-        quad_generator.push_func_era();
+        quad_generator.push_func_era(_id.clone());
     }
 };
 
@@ -310,7 +333,8 @@ LlamadaSinId: () = {
         let parameter_counter = quad_generator.get_parameter_counter();
         let _ = semantics.dir_func.check_func_param_count(parameter_counter);
         if let Ok(func_name) = semantics.dir_func.get_func_name() {
-            quad_generator.push_func_gosub(func_name);
+            let return_info = semantics.dir_func.get_call_func_return_info();
+            quad_generator.push_func_gosub(func_name, return_info);
         }
     },
 };
@@ -353,8 +377,13 @@ OpcionImprime: () = {
 };
 
 ElementoImprime: () = {
-    Expresion => (),
-    <_l:Letrero> => (),
+    Expresion => {
+        quad_generator.push_print();
+    },
+    <_l:Letrero> => {
+        quad_generator.push_string(_l.clone());
+        quad_generator.push_print();
+    },
 };
 
 AgregarOpcionImprime: () = {
@@ -480,10 +509,37 @@ pub PushIgual: () = {
 
 Factor: () = {
     "(" Expresion ")" => (),
-    Signo Valor => (),
+    "+" <_c:Constante> => { quad_generator.push_constante(_c); },
+    "-" <_c:Constante> => {
+        let negated = match _c {
+            QuadValue::Entero(v) => QuadValue::Entero(-v),
+            QuadValue::Flotante(v) => QuadValue::Flotante(-v),
+            QuadValue::Boleano(v) => QuadValue::Boleano(v),
+        };
+        quad_generator.push_constante(negated);
+    },
+    "+" <_id:Identificador> => {
+        if let Ok((address, var_type)) = semantics.dir_func.get_var_info(&_id) {
+            quad_generator.push_id(address, var_type);
+        }
+    },
+    "-" <_id:Identificador> => {
+        if let Ok((address, var_type)) = semantics.dir_func.get_var_info(&_id) {
+            quad_generator.push_id(address, var_type);
+        }
+    },
     // Punto neurálgico Quads 2
     <_c:Constante> => { quad_generator.push_constante(_c); },
-    PushId OpcionFactorId=> (),
+    
+    CheckFuncId "(" ListaExpresion ")" => {
+        let parameter_counter = quad_generator.get_parameter_counter();
+        let _ = semantics.dir_func.check_func_param_count(parameter_counter);
+        if let Ok(func_name) = semantics.dir_func.get_func_name() {
+            let return_info = semantics.dir_func.get_call_func_return_info();
+            quad_generator.push_func_gosub(func_name, return_info);
+        }
+    },
+    PushId => (),
 };
 
 // Punto neurálgico Quads 1
@@ -498,16 +554,6 @@ pub PushId: () = {
 OpcionFactorId: () = {
     LlamadaSinId => (),
     => (),
-};
-
-Signo: () = {
-    "-" => (),
-    "+" => (),
-};
-
-Valor: () = {
-    <_id:Identificador> => (),
-    <_c:Constante> => (),
 };
 
 Constante: QuadValue = {
